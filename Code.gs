@@ -24,25 +24,22 @@ function onChange(e)
 
       // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
       if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
-          (info[maxRow] === info[numRows] && info[maxCol] === info[numCols]) || info[isAdagioOE] || info[isBackOrderItems]) 
+          ((info[maxRow] === info[numRows] && info[maxCol] === info[numCols]) && (info[isAdagioOE] || info[isBackOrderItems]))) 
       {
         spreadsheet.toast('Processing imported data...', '', 60)
         
-
         const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols]); // This is the shopify order data
         const fileName = sheets[sheet].getSheetName();
 
-        // if (fileName.substring(0, 7) !== "Copy Of") // Don't delete the sheets that are duplicates
-        //   spreadsheet.deleteSheet(sheets[sheet]) // Delete the new sheet that was created
+        if (fileName.substring(0, 7) !== "Copy Of") // Don't delete the sheets that are duplicates
+          spreadsheet.deleteSheet(sheets[sheet]) // Delete the new sheet that was created
 
-Logger.log(fileName)
+        if (info[isAdagioOE])
+          updateOrdersOnTracker(values, spreadsheet);
+        else if (info[isBackOrderItems])
+          updateBackOrderedItemsOnTracker(values, spreadsheet, fileName);
 
-        // if (info[isAdagioOE])
-        //   updateOrdersOnTracker(values, spreadsheet);
-        // else if (info[isBackOrderItems])
-        //   updateBackOrderedItemsOnTracker(values, spreadsheet, fileName);
-
-        // break;
+        break;
       }
     }
   }
@@ -63,6 +60,202 @@ function onEdit(e)
   {
     Browser.msgBox(error)
   }
+}
+
+/**
+ * This function allows the user to add items from the P/O or B/O page to the relevant transfer page.
+ * 
+ * @author Jarren Ralf
+ */
+function addItemsToTransferSheet()
+{
+  const activeSheet = SpreadsheetApp.getActiveSheet();
+  var activeRanges = activeSheet.getActiveRangeList().getRanges(); // The selected ranges on the item search sheet
+  var firstRows = [], lastRows = [], numRows = [], values, sku = [], qty = [], name = [], ordNum = [];
+  
+  // Find the first row and last row in the the set of all active ranges
+  for (var r = 0; r < activeRanges.length; r++)
+  {
+    firstRows.push(activeRanges[r].getRow());
+     lastRows.push(activeRanges[r].getLastRow())
+      numRows.push(lastRows[r] - firstRows[r] + 1);
+      values = activeSheet.getSheetValues(firstRows[r], 2, numRows[r], 8)[0]
+       sku.push(values[3])
+       qty.push(values[2])
+      name.push(values[0])
+    ordNum.push(values[7])
+  }
+
+  var firstRow = Math.min(...firstRows); // This is the smallest starting row number out of all active ranges
+  var skus = [].concat.apply([], sku); // Concatenate all of the item values as a 2-D array
+  var numItems = skus.length;
+
+  if (firstRow < 3)
+    Browser.msgBox('Please select items from the list.')
+  else if (numItems === 0)
+    Browser.msgBox('Please select items from the list.')
+  else
+  {
+    const spreadsheet = SpreadsheetApp.getActive()
+    const sheetName = activeSheet.getSheetName();
+    const csvData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString())
+    const itemNum = csvData[0].indexOf('Item #')
+    const items = csvData.filter(item => skus.includes(item[itemNum]));
+    const today = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(), 'dd MMM yyyy');
+    var row = 0, numRows = 0, sheet, itemValues, fromLocation, toLocation, url;
+
+    if (qty.length !== items.length)
+      Browser.msgBox('Contact AJ and tell him what SKUs you are trying to put on the transfer sheet. Let him know that ' + (qty.length - items.length) + ' of those SKUs can\'t be found in the inventory.csv. **Please note that if you see \"Comment Line\" in the SKU column that you can\'t select that line while performing this action.')
+    else
+    {
+      var ui = SpreadsheetApp.getUi();
+
+      var response = ui.prompt('Which PNT location are you shipping FROM?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+
+      // Process the user's response.
+      if (response.getSelectedButton() == ui.Button.OK)
+      {
+        var textResponse = response.getResponseText().toUpperCase();
+
+        if (textResponse == 'RICH')
+        {
+          fromLocation = 'Richmond';
+
+          response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+
+          // Process the user's response.
+          if (response.getSelectedButton() == ui.Button.OK)
+          {
+            textResponse = response.getResponseText().toUpperCase();
+
+            if (textResponse == 'PARKS')
+              toLocation = 'Parskville'
+            else if (textResponse == 'PR')
+              toLocation = 'Rupert'
+            else
+              ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+          }
+          else // The user has clicked on CLOSE or CANCEL
+            return;
+        }
+        else if (textResponse == 'PARKS')
+        {
+          toLocation = 'Richmond';
+          fromLocation = 'Parksville';
+        }
+        else if (textResponse == 'PR')
+        {
+          toLocation = 'Richmond';
+          fromLocation = 'Rupert';
+        }
+        else
+          ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+      }
+      else // The user has clicked on CLOSE or CANCEL
+        return;
+
+      switch (fromLocation)
+      {
+        case 'Richmond':
+
+          switch (toLocation)
+          {
+            case 'Parskville':
+              url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
+              sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Eryn (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], v[3], '']) 
+              row = sheet.getLastRow() + 1;
+              numRows = itemValues.length;
+              sheet.getRange(row, 1, numRows, 8).setNumberFormat('@').setValues(itemValues)
+              applyFullRowFormatting(sheet, row, numRows, false)
+              break;
+            case 'Rupert':
+              url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
+              sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Doug (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], v[4], '']) 
+              row = sheet.getLastRow() + 1;
+              numRows = itemValues.length;
+              sheet.getRange(row, 1, numRows, 8).setNumberFormat('@').setValues(itemValues)
+              applyFullRowFormatting(sheet, row, numRows, false)
+              break;
+          }
+          break;
+        case 'Parksville':
+          url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
+          sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], qty[idx]]) 
+          row = sheet.getLastRow() + 1;
+          numRows = itemValues.length;
+          sheet.getRange(row, 1, numRows, 6).setNumberFormat('@').setValues(itemValues)
+          applyFullRowFormatting(sheet, row, numRows, true)
+          break;
+        case 'Rupert':
+          url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
+          sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], qty[idx]]) 
+          row = sheet.getLastRow() + 1;
+          numRows = itemValues.length;
+          sheet.getRange(row, 1, numRows, 6).setNumberFormat('@').setValues(itemValues)
+          applyFullRowFormatting(sheet, row, numRows, true)
+          break;
+      }
+
+      if (sheetName == 'B/O' && fromLocation != undefined && toLocation != undefined)
+        activeRanges.map(rng => activeSheet.getRange(rng.getRow(), 10, rng.getNumRows(), 1).setRichTextValue(
+          SpreadsheetApp
+            .newRichTextValue()
+            .setText('Shipping from ' + fromLocation + ' to ' + toLocation)
+            .setLinkUrl(url + '&range=B' + row)
+            .build()))
+    }
+  }
+}
+
+/**
+ * Apply the proper formatting to the Order, Shipped, Received, ItemsToRichmond, Manual Counts, or InfoCounts page.
+ *
+ * @param {Sheet}   sheet  : The current sheet that needs a formatting adjustment
+ * @param {Number}   row   : The row that needs formating
+ * @param {Number} numRows : The number of rows that needs formatting
+ * @param {Number} numCols : The number of columns that needs formatting
+ * @author Jarren Ralf
+ */
+function applyFullRowFormatting(sheet, row, numRows, isItemsToRichmondPage)
+{
+  const BLUE = '#c9daf8', GREEN = '#d9ead3', YELLOW = '#fff2cc', GREEN_DATE = '#b6d7a8';
+
+  if (isItemsToRichmondPage)
+  {
+    var      borderRng = sheet.getRange(row, 1, numRows, 8);
+    var  shippedColRng = sheet.getRange(row, 6, numRows   );
+    var thickBorderRng = sheet.getRange(row, 6, numRows, 3);
+    var backgroundColours = [...Array(numRows)].map(_ => [GREEN_DATE, 'white', 'white', 'white', 'white', 'white', 'white', 'white'])
+    var numberFormats = [...Array(numRows)].map(_ => ['dd MMM yyyy', '@', '@', '@', '@', '#.#', '@', '@']);
+    var horizontalAlignments = [...Array(numRows)].map(_ => ['right', 'center', 'center', 'left', 'center', 'center', 'center', 'left']);
+    var wrapStrategies = [...Array(numRows)].map(_ => [...new Array(2).fill(SpreadsheetApp.WrapStrategy.OVERFLOW), ...new Array(3).fill(SpreadsheetApp.WrapStrategy.WRAP), 
+        SpreadsheetApp.WrapStrategy.CLIP, SpreadsheetApp.WrapStrategy.WRAP, SpreadsheetApp.WrapStrategy.WRAP]);
+  }
+  else
+  {
+    var         borderRng = sheet.getRange(row, 1, numRows, 11);
+    var     shippedColRng = sheet.getRange(row, 9, numRows    );
+    var    thickBorderRng = sheet.getRange(row, 9, numRows,  2);
+    var backgroundColours = [...Array(numRows)].map(_ => [GREEN_DATE, 'white', 'white', 'white', 'white', 'white', 'white', 'white', 'white', 'white', 'white'])
+    var numberFormats = [...Array(numRows)].map(e => ['dd MMM yyyy', '@', '#.#', '@', '@', '@', '#.#', '0.#', '#.#', '@', 'dd MMM yyyy']);
+    var horizontalAlignments = [...Array(numRows)].map(e => ['right', ...new Array(3).fill('center'), 'left', ...new Array(6).fill('center')]);
+    var wrapStrategies = [...Array(numRows)].map(e => [...new Array(3).fill(SpreadsheetApp.WrapStrategy.OVERFLOW), ...new Array(3).fill(SpreadsheetApp.WrapStrategy.WRAP),
+      ...new Array(3).fill   (SpreadsheetApp.WrapStrategy.CLIP), SpreadsheetApp.WrapStrategy.WRAP, SpreadsheetApp.WrapStrategy.CLIP]);
+  }
+
+  borderRng.setFontSize(10).setFontLine('none').setFontWeight('bold').setFontStyle('normal').setFontFamily('Arial').setFontColor('black')
+    .setNumberFormats(numberFormats).setHorizontalAlignments(horizontalAlignments).setWrapStrategies(wrapStrategies)
+    .setBorder(true, true, true, true,  null, true, 'black', SpreadsheetApp.BorderStyle.SOLID).setBackgrounds(backgroundColours);
+
+  thickBorderRng.setBorder(null, true, null, true, false, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK).setBackground(GREEN);
+  shippedColRng.setBackground(YELLOW);
+
+  if (!isItemsToRichmondPage)
+    sheet.getRange(row, 7, numRows, 2).setBorder(null,  true,  null,  null,  true,  null, 'black', SpreadsheetApp.BorderStyle.SOLID).setBackground(BLUE);
 }
 
 /**
@@ -407,6 +600,8 @@ function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
 
     Logger.log('The following new Back Ordered items were added to the B/O tab:')
     Logger.log(newBackOrderItems)
+
+    spreadsheet.toast(numNewBackOrderItems + ' Items Added\n ', 'B/O Items Imported', 60)
   }
 }
 
@@ -527,7 +722,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       .filter(ordNum => ordNum !== ''); 
 
     Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
-    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
+    var currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
       .filter(currentOrd => {
 
         isLodgeOrderComplete = completedLodgeOrders.includes(currentOrd[2]);
@@ -545,7 +740,9 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       .filter(ord => ord[14] === 'Completed')
       .map(ord => ord[2]).flat()
       .filter(ordNum => ordNum !== '');
-    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
+
+    Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
+    var currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
       .filter(currentOrd => {
 
         isCharterGuideOrderComplete = completedCharterGuideOrders.includes(currentOrd[2]);
@@ -559,6 +756,11 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     if (currentCharterGuideOrders.length < numCharterGuideOrders)
       charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, currentCharterGuideOrders.length, 15).setValues(currentCharterGuideOrders);
   }
+  else
+  {
+    var currentLodgeOrders = numLodgeOrders;
+    var currentCharterGuideOrders = numLodgeOrders;
+  }
 
-  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added ' + (numLodgeOrders - currentLodgeOrders.length) + ' Removed' + 'CHARTER: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - currentCharterGuideOrders.length) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - currentLodgeOrders.length) + ' Removed CHARTER: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - currentCharterGuideOrders.length) + ' Removed', 'Orders Imported', 60)
 }
