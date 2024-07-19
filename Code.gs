@@ -370,7 +370,8 @@ function getOrderNumber(ordNum)
     return ordNum;
   else
   {
-    const response = SpreadsheetApp.getUi().prompt('Enter the order number:',);
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.prompt('Enter the order number:',);
     const orderNumber = response.getResponseText().trim(); 
 
     return (response.getSelectedButton() !== ui.Button.OK) ? '' : (isNumber(orderNumber) && orderNumber.length === 5) ? orderNumber : '';
@@ -570,7 +571,12 @@ function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
     var currentBackOrderItems = backOrderSheet.getSheetValues(3, 1, numRows, backOrderSheet.getLastColumn()).filter(item => isBlank(item[8]) || item[8] !== orderNumber);
     var numBackOrderedItems = currentBackOrderItems.length;
     backOrderSheet.getRange(3, 1, numBackOrderedItems, currentBackOrderItems[0].length).setValues(currentBackOrderItems);
-    backOrderSheet.deleteRows(numBackOrderedItems + 3, numRows - numBackOrderedItems);
+
+    if (numRows > numBackOrderedItems)
+    {
+      var numItemsRemoved = numRows - numBackOrderedItems;
+      backOrderSheet.deleteRows(numBackOrderedItems + 3, numRows - numBackOrderedItems);
+    }
   }
 
   const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
@@ -601,8 +607,10 @@ function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
     Logger.log('The following new Back Ordered items were added to the B/O tab:')
     Logger.log(newBackOrderItems)
 
-    spreadsheet.toast(numNewBackOrderItems + ' Items Added\n ', 'B/O Items Imported', 60)
+    spreadsheet.toast(numNewBackOrderItems + ' Added ' + (numItemsRemoved - numNewBackOrderItems) + ' Removed', 'B/O Items Imported', 60)
   }
+  else
+    spreadsheet.toast('ORD# ' + orderNumber + ' may be in the process of bring shipped.', '**NO B/O Items Imported**', 60)
 }
 
 /**
@@ -722,7 +730,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       .filter(ordNum => ordNum !== ''); 
 
     Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
-    var currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
+    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
       .filter(currentOrd => {
 
         isLodgeOrderComplete = completedLodgeOrders.includes(currentOrd[2]);
@@ -733,8 +741,10 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         return !isLodgeOrderComplete;
       });
 
-    if (currentLodgeOrders.length < numLodgeOrders)
-      lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, currentLodgeOrders.length, 15).setValues(currentLodgeOrders);
+    var numCurrentLodgeOrders = currentLodgeOrders.length;
+
+    if (numCurrentLodgeOrders < numLodgeOrders)
+      lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, numCurrentLodgeOrders, 15).setValues(currentLodgeOrders);
 
     const completedCharterGuideOrders = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 13)
       .filter(ord => ord[14] === 'Completed')
@@ -742,7 +752,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       .filter(ordNum => ordNum !== '');
 
     Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
-    var currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
+    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
       .filter(currentOrd => {
 
         isCharterGuideOrderComplete = completedCharterGuideOrders.includes(currentOrd[2]);
@@ -753,14 +763,16 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         return !isCharterGuideOrderComplete;
       });
 
-    if (currentCharterGuideOrders.length < numCharterGuideOrders)
-      charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, currentCharterGuideOrders.length, 15).setValues(currentCharterGuideOrders);
+    var numCurrentCharterGuideOrders = currentCharterGuideOrders.length;
+
+    if (numCurrentCharterGuideOrders < numCharterGuideOrders)
+      charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 15).setValues(currentCharterGuideOrders);
   }
   else
   {
-    var currentLodgeOrders = numLodgeOrders;
-    var currentCharterGuideOrders = numLodgeOrders;
+    var numCurrentLodgeOrders = numLodgeOrders;
+    var numCurrentCharterGuideOrders = numLodgeOrders;
   }
 
-  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - currentLodgeOrders.length) + ' Removed CHARTER: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - currentCharterGuideOrders.length) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed CHARTER: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
 }
