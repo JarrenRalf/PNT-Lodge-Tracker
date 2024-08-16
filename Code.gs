@@ -181,7 +181,7 @@ function addItemsToTransferSheet()
           }
           break;
         case 'Parksville':
-          url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
+          url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
           sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
           itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], qty[idx]]) 
           row = sheet.getLastRow() + 1;
@@ -190,7 +190,7 @@ function addItemsToTransferSheet()
           applyFullRowFormatting(sheet, row, numRows, true)
           break;
         case 'Rupert':
-          url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
+          url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
           sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
           itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], qty[idx]]) 
           row = sheet.getLastRow() + 1;
