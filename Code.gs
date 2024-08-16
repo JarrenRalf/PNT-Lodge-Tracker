@@ -37,7 +37,7 @@ function onChange(e)
         if (info[isAdagioOE])
           updateOrdersOnTracker(values, spreadsheet);
         else if (info[isBackOrderItems])
-          updateBackOrderedItemsOnTracker(values, spreadsheet, fileName);
+          updateItemsOnTracker(values, spreadsheet, fileName);
 
         break;
       }
@@ -79,11 +79,11 @@ function addItemsToTransferSheet()
     firstRows.push(activeRanges[r].getRow());
      lastRows.push(activeRanges[r].getLastRow())
       numRows.push(lastRows[r] - firstRows[r] + 1);
-      values = activeSheet.getSheetValues(firstRows[r], 2, numRows[r], 8)[0]
-       sku.push(values[3])
-       qty.push(values[2])
-      name.push(values[0])
-    ordNum.push(values[7])
+      values = activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 9)
+       sku.push(...values.map(v => v[3]))
+       qty.push(...values.map(v => v[2]))
+      name.push(...values.map(v => v[0]))
+    ordNum.push(...values.map(v => v[8]))
   }
 
   var firstRow = Math.min(...firstRows); // This is the smallest starting row number out of all active ranges
@@ -163,7 +163,7 @@ function addItemsToTransferSheet()
             case 'Parskville':
               url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
               sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Eryn (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], v[3], '']) 
+              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Eryn (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], v[3], '']) 
               row = sheet.getLastRow() + 1;
               numRows = itemValues.length;
               sheet.getRange(row, 1, numRows, 8).setNumberFormat('@').setValues(itemValues)
@@ -172,7 +172,7 @@ function addItemsToTransferSheet()
             case 'Rupert':
               url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
               sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Doug (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], v[4], '']) 
+              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Doug (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], v[4], '']) 
               row = sheet.getLastRow() + 1;
               numRows = itemValues.length;
               sheet.getRange(row, 1, numRows, 8).setNumberFormat('@').setValues(itemValues)
@@ -183,7 +183,7 @@ function addItemsToTransferSheet()
         case 'Parksville':
           url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
           sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], qty[idx]]) 
+          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], qty[idx]]) 
           row = sheet.getLastRow() + 1;
           numRows = itemValues.length;
           sheet.getRange(row, 1, numRows, 6).setNumberFormat('@').setValues(itemValues)
@@ -192,7 +192,7 @@ function addItemsToTransferSheet()
         case 'Rupert':
           url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
           sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + ' ORD# ' + ordNum[idx], qty[idx]]) 
+          itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', v[0], v[1], 'ATTN: Scott (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], qty[idx]]) 
           row = sheet.getLastRow() + 1;
           numRows = itemValues.length;
           sheet.getRange(row, 1, numRows, 6).setNumberFormat('@').setValues(itemValues)
@@ -201,12 +201,24 @@ function addItemsToTransferSheet()
       }
 
       if (sheetName == 'B/O' && fromLocation != undefined && toLocation != undefined)
-        activeRanges.map(rng => activeSheet.getRange(rng.getRow(), 10, rng.getNumRows(), 1).setRichTextValue(
-          SpreadsheetApp
-            .newRichTextValue()
-            .setText('Shipping from ' + fromLocation + ' to ' + toLocation)
-            .setLinkUrl(url + '&range=B' + row)
-            .build()))
+      {
+        activeSheet.getFilter().remove(); // Remove the filter
+        activeSheet.getRange(2, 1, 1, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
+        SpreadsheetApp.flush();
+
+        const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
+        activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
+      }
+
+      if (sheetName == 'I/O' && fromLocation != undefined && toLocation != undefined)
+      {
+        activeSheet.getFilter().remove(); // Remove the filter
+        activeSheet.getRange(2, 1, 1, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
+        SpreadsheetApp.flush();
+
+        const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
+        activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
+      }
     }
   }
 }
@@ -259,6 +271,104 @@ function applyFullRowFormatting(sheet, row, numRows, isItemsToRichmondPage)
 }
 
 /**
+ * This function creates the onChange trigger that handles all of the imported files.
+ * 
+ * @author Jarren Ralf
+ */
+function createTriggers()
+{
+  ScriptApp.newTrigger('onChange').forSpreadsheet(SpreadsheetApp.getActive()).onChange().create();
+}
+
+/**
+ * This function finds items with on the B/O tab that matches the given order number and deletes them.
+ * 
+ * @param {String || String[][]} orderNumber : The order number of the current order being updated on the ORDERS page.
+ * @param     {Spreadsheet}      spreadsheet : The active spreadsheet
+ * @author Jarren Ralf
+ */
+function deleteBackOrderedItems(orderNumber, spreadsheet)
+{
+  const boSheet = spreadsheet.getSheetByName('B/O');
+  const ioSheet = spreadsheet.getSheetByName('I/O');
+  boSheet.getFilter().remove(); // Remove the filter
+  ioSheet.getFilter().remove();
+        
+
+  Logger.log('Array.isArray(orderNumber): ' + Array.isArray(orderNumber))
+
+  if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
+  {
+    var orderNumbers, row, numRows;
+
+    orderNumber.map(ordNum => {
+
+      if (!isBlank(ordNum[2]))
+      {
+        orderNumbers = boSheet.getSheetValues(3, 11, boSheet.getLastRow() - 2, 1);
+        row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
+
+        if (row !== -1)
+        {
+          numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
+          boSheet.deleteRows(row + 3, numRows);
+          SpreadsheetApp.flush();
+        }
+
+        // Inital Orders Sheet
+        orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1);
+        row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
+
+        if (row !== -1)
+        {
+          numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
+          ioSheet.deleteRows(row + 3, numRows);
+          SpreadsheetApp.flush();
+        }
+      }
+    })
+  }
+  else
+  {
+    if (!isBlank(orderNumber)) // Order number is not blank on the Orders page
+    {
+      const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet.getLastRow() - 2, 1);
+      const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1);
+      const row_BO = orderNumbers_BO.findIndex(ordNum => ordNum[0] == orderNumber);
+      const row_IO = orderNumbers_IO.findIndex(ordNum => ordNum[0] == orderNumber);
+
+      if (row_BO !== -1)
+      {
+        const numRows_BO = orderNumbers_BO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_BO + 1;
+        boSheet.deleteRows(row_BO + 3, numRows_BO);
+      }
+
+      if (row_IO !== -1)
+      {
+        const numRows_IO = orderNumbers_IO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_IO + 1;
+        ioSheet.deleteRows(row_IO + 3, numRows_IO);
+      }
+    }
+  }  
+
+  boSheet.getRange(2, 1, 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  ioSheet.getRange(2, 1, 1, ioSheet.getLastColumn()).createFilter();
+}
+
+/**
+ * This function checks whether the given order number contains a back ordered items or not.
+ * 
+ * @param {String} order : The order number of the given order.
+ * @param {String[]} backOrderNumbers : The list of order numbers that contains back orders.
+ * @returns {Boolean} Returns true if there are back ordered items on the given order, or false if it is an initial order.
+ * @author Jarren Ralf
+ */
+function doesOrderContainBOs(order, backOrderNumbers)
+{
+  return backOrderNumbers.includes(order)
+}
+
+/**
  * This function converts Yes or No response from Order Entry regarding the status of the order into Back Order or not.
  * 
  * @param {String} isOrderComplete : Yes or No depending on whether the order is complete.
@@ -283,6 +393,22 @@ function getDateString(date, months)
   const d_split = date.toString().split('-');
   
   return months[d_split[0]] + ' ' + d_split[1] + ', ' + d_split[2];
+}
+
+/**
+ * This function takes the paired list of order numbers and the employee name that entered that order in adagio, as well as an order number to try and find
+ * within that list, it searches and returns the name of the employee, or blank if not found.
+ * 
+ * @param {String[]} orderNumber : The given order number that is being searched for.
+ * @param {String}     orders    : A list of the current orders and who entered them into Adagio.
+ * @return {String} Returns the name of the person who entered the order in Adagio or blank.
+ * @author Jarren Ralf
+ */
+function getEnteredByNameAndApprovalStatus(orderNumber, orders)
+{
+  const enteredBy = orders.find(ordNum => ordNum[1] == orderNumber)
+  
+  return (enteredBy != null) ? [enteredBy[0], enteredBy[2]] : '';
 }
 
 /**
@@ -447,7 +573,7 @@ function moveRow(e)
     const sheet = spreadsheet.getActiveSheet();
     const sheetNames = sheet.getSheetName().split(" ") // Split the sheet name, which will be used to distinguish between Logde and Guide page
 
-    if (sheetNames[1] == "ORDERS") // An  edit is happening on one of the Order pages in column 14, the order status column
+    if (sheetNames[1] == "ORDERS") // An edit is happening on one of the Order pages
     {
       const numCols = sheet.getLastColumn()
 
@@ -459,7 +585,7 @@ function moveRow(e)
         if (value == 'Updated')
         {
           range.setValue('')
-          sheet.getRange(row, 5).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00') // 
+          sheet.getRange(row, 5).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00')
         }
         else if (value == 'Picking')
         {
@@ -480,17 +606,20 @@ function moveRow(e)
             rowValues[4] = ''; // Clear the Back Order column
             spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues) // Move the row of values to the completed page
             sheet.deleteRow(row); // Delete the row from the order page
+            deleteBackOrderedItems(rowValues[2], spreadsheet);
           }
           else if (value == "Cancelled") // The order status is being set to cancelled 
           { 
             spreadsheet.getSheetByName("CANCELLED").appendRow(rowValues) // Move the row of values to the cancelled page
             sheet.deleteRow(row); // Delete the row from the order page
+            deleteBackOrderedItems(rowValues[2], spreadsheet);
           }
           else if (value == "Partial") // The order status is being set to partial
           {
             rowValues[4] = 'BO'; // Set the value in the back order column to 'BO'
             spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues); // Move the row of values to the completed page
             sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]); // Clear the invoice values, and set the status
+            deleteBackOrderedItems(rowValues[2], spreadsheet);
           }
         }
       }
@@ -513,20 +642,6 @@ function moveRow(e)
 }
 
 /**
- * This function displays the instructions for how the users import their order information to store a list of back orders on the sheet.
- * 
- * @author Jarren Ralf
- */
-function partialOrderDataRetreivalInstructions()
-{
-  var html = HtmlService.createHtmlOutputFromFile('backOrderPrompt.html')
-    .setWidth(1400)
-    .setHeight(600);
-  SpreadsheetApp.getUi() // Or DocumentApp or SlidesApp or FormApp.
-    .showModalDialog(html, "Download Back Order Data from Adagio Order Entry");
-}
-
-/**
  * This function removes the dashes from the SKU number.
  * 
  * @param {String} sku : The sku number with 2 dashes in it.
@@ -541,11 +656,12 @@ function removeDashesFromSku(sku)
 /**
  * This function handles the import of an order entry order that may contain back ordered items.
  * 
- * @param {String[][]} items : All of the current orders from Adagio.
+ * @param {String[][]}     items    : A list of items on the order that was imported.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {String}        ordNum    : The order number that is being imported.
  * @author Jarren Ralf
  */
-function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
+function updateItemsOnTracker(items, spreadsheet, ordNum)
 {
   items.pop(); // Remove the "Total" or final line
 
@@ -554,6 +670,7 @@ function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
   const dateIdx = headerOE.indexOf('Date');
   const customerNumIdx = headerOE.indexOf('Cust #');
   const originalOrderedQtyIdx = headerOE.indexOf('Qty Original Ordered');
+  const orderedQtyIdx = headerOE.indexOf('Qty Ordered'); 
   const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
   const skuIdx = headerOE.indexOf('Item');
   const descriptionIdx = headerOE.indexOf('Description');
@@ -563,54 +680,99 @@ function updateBackOrderedItemsOnTracker(items, spreadsheet, ordNum)
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
   const orderNumber = getOrderNumber(ordNum);
 
-  const backOrderSheet = spreadsheet.getSheetByName('B/O'); 
-  const numRows = backOrderSheet.getLastRow() - 2;
+  const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
+  const charterGuideCustomerSheet = spreadsheet.getSheetByName('Charter & Guide Customer List');
+  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
+  const partialOrdersSheet = spreadsheet.getSheetByName('Partial Orders');
+  const enteredByNamesAndApprovalStatus = lodgeOrdersSheet.getSheetValues(3, 2, lodgeOrdersSheet.getLastRow() - 2, 3);
+  const customerNames = lodgeCustomerSheet.getSheetValues(3, 1, lodgeCustomerSheet.getLastRow() - 2, 3).concat(charterGuideCustomerSheet.getSheetValues(3, 1, charterGuideCustomerSheet.getLastRow() - 2, 3))
+  const orderNumbers_BO = partialOrdersSheet.getSheetValues(2, 1, partialOrdersSheet.getRange(partialOrdersSheet.getLastRow(), 1).getNextDataCell(SpreadsheetApp.Direction.UP).getRow() - 1, 1).flat()
+
+  const orderDate = getDateString(items[0][dateIdx], months);
+  const enteredByAndApproval = getEnteredByNameAndApprovalStatus(orderNumber, enteredByNamesAndApprovalStatus);
+  const customerName = getProperTypesetName(items[0][customerNumIdx], customerNames, 2);
+  const locationName = getLocationName(items[0][locationIdx])
+
+  if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
+  {
+    var newItems = items.filter(item => item[isItemCompleteIdx] ).filter(item => item[backOrderQtyIdx]).map(item => {
+        return [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
+          removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
+    });
+
+    var itemSheet = spreadsheet.getSheetByName('B/O'); 
+  }
+  else 
+  {
+    var newItems = items.map(item => {
+        return [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], 
+          removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
+    });
+
+    var itemSheet = spreadsheet.getSheetByName('I/O'); 
+  }
+
+  const numRows = itemSheet.getLastRow() - 2;
+  const numNewItems = newItems.length;
+  var numItemsRemoved = numNewItems;
+  itemSheet.getFilter().remove(); // Remove the filter
 
   if (numRows > 0)
   {
-    var currentBackOrderItems = backOrderSheet.getSheetValues(3, 1, numRows, backOrderSheet.getLastColumn()).filter(item => isBlank(item[8]) || item[8] !== orderNumber);
-    var numBackOrderedItems = currentBackOrderItems.length;
-    backOrderSheet.getRange(3, 1, numBackOrderedItems, currentBackOrderItems[0].length).setValues(currentBackOrderItems);
+    
+    const ordNum = itemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Order #');
+    var currentItems = itemSheet.getSheetValues(3, 1, numRows, itemSheet.getLastColumn()).filter(item => isBlank(item[ordNum]) || item[ordNum] !== orderNumber);
+    var numCurrentItems = currentItems.length;
+    itemSheet.getRange(3, 1, numCurrentItems, currentItems[0].length).setValues(currentItems);
 
-    if (numRows > numBackOrderedItems)
+    if (numRows > numCurrentItems)
     {
-      var numItemsRemoved = numRows - numBackOrderedItems;
-      backOrderSheet.deleteRows(numBackOrderedItems + 3, numRows - numBackOrderedItems);
+      numItemsRemoved = numRows - numCurrentItems;
+      itemSheet.deleteRows(numCurrentItems + 3, numItemsRemoved);
     }
   }
 
-  const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
-  const charterGuideCustomerSheet = spreadsheet.getSheetByName('Charter & Guide Customer List');
-  const customerNames = lodgeCustomerSheet.getSheetValues(3, 1, lodgeCustomerSheet.getLastRow() - 2, 3).concat(charterGuideCustomerSheet.getSheetValues(3, 1, charterGuideCustomerSheet.getLastRow() - 2, 3))
-  
-  const newBackOrderItems = items.filter(item => item[isItemCompleteIdx] ).filter(item => item[backOrderQtyIdx]).map(item => {
-      return [getDateString(item[dateIdx], months), getProperTypesetName(item[customerNumIdx], customerNames, 2), item[originalOrderedQtyIdx],
-      item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], getLocationName(item[locationIdx]) , orderNumber, '', '', '', ''] // Back Ordered Items
-  });
-
-  const numNewBackOrderItems = newBackOrderItems.length;
-
   Logger.log('Order Number: ' + orderNumber)
 
-  if (numNewBackOrderItems > 0)
+  if (numNewItems > 0)
   {
-    const numCols = newBackOrderItems[0].length;
+    const numCols = newItems[0].length;
 
-    if (numRows > 0)
-      backOrderSheet.getRange(numBackOrderedItems + 3, 1, numNewBackOrderItems, numCols)
-          .setNumberFormats(new Array(numNewBackOrderItems).fill(['MMM dd, yyyy', '@', '#', '#', '@', '@', '$#,##0.00', '@', '@', '@', '@', '@', '@'])).setValues(newBackOrderItems)
-        .offset(-1*numBackOrderedItems, 0, numBackOrderedItems + numNewBackOrderItems, numCols).sort([{column: 1, ascending: true}]);
+    if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
+    {
+      if (numRows > 0)
+        itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+            .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+          .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 1, ascending: true}]);
+      else
+        itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+          .setValues(newItems)
+
+      Logger.log('The following new Back Ordered items were added to the B/O tab:')
+      Logger.log(newItems)
+
+      spreadsheet.toast(numNewItems + ' Added ' + (numItemsRemoved - numNewItems) + ' Removed', 'B/O Items Imported', 60)
+    }
     else
-      backOrderSheet.getRange(3, 1, numNewBackOrderItems, numCols).setNumberFormats(new Array(numNewBackOrderItems).fill(['MMM dd, yyyy', '@', '#', '#', '@', '@', '$#,##0.00', '@', '@', '@', '@', '@', '@']))
-        .setValues(newBackOrderItems)
+    {
+      if (numRows > 0)
+        itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+            .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+          .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 1, ascending: true}]);
+      else
+        itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+          .setValues(newItems)
 
-    Logger.log('The following new Back Ordered items were added to the B/O tab:')
-    Logger.log(newBackOrderItems)
+      Logger.log('The following new Ordered items were added to the I/O tab:')
+      Logger.log(newItems)
 
-    spreadsheet.toast(numNewBackOrderItems + ' Added ' + (numItemsRemoved - numNewBackOrderItems) + ' Removed', 'B/O Items Imported', 60)
+      spreadsheet.toast(numNewItems + ' Added ' + (numItemsRemoved - numNewItems) + ' Removed', 'I/O Items Imported', 60)
+    }
   }
   else
-    spreadsheet.toast('ORD# ' + orderNumber + ' may be in the process of bring shipped.', '**NO B/O Items Imported**', 60)
+    spreadsheet.toast('ORD# ' + orderNumber + ' may be in the process of being shipped.', '**NO B/O or I/O Items Imported**', 60)
+
+  itemSheet.getRange(2, 1, 1, itemSheet.getLastColumn()).createFilter(); // Create a filter in the header
 }
 
 /**
@@ -700,6 +862,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     Logger.log('The following new Lodge orders were added to the tracker:')
     Logger.log(newLodgeOrders)
+
+    deleteBackOrderedItems(newLodgeOrders, spreadsheet);
   }
 
   if (numNewCharterGuideOrder > 0)
@@ -771,8 +935,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   else
   {
     var numCurrentLodgeOrders = numLodgeOrders;
-    var numCurrentCharterGuideOrders = numLodgeOrders;
+    var numCurrentCharterGuideOrders = numCharterGuideOrders;
   }
 
-  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed CHARTER: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
 }
