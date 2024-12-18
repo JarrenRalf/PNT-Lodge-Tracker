@@ -855,9 +855,14 @@ function moveRow(e)
         }
         else if (value == 'Picking')
         {
-          const ui = SpreadsheetApp.getUi()
-          ui.alert('Order NOT Approved', 'You have started picking an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
-            sheet.getRange(row, 2).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+          const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
+
+          if (!rowValues[3]) // Order is not approved
+          {
+            const ui = SpreadsheetApp.getUi()
+            ui.alert('Order NOT Approved', 'You have started picking an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
+              sheet.getRange(row, 2).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+          }
         }
         else
         {
@@ -869,6 +874,7 @@ function moveRow(e)
 
           if (value == "Completed") // The order status is being set to complete 
           {
+            rowValues[3] = true;
             rowValues[4] = ''; // Clear the Back Order column
             spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues) // Move the row of values to the completed page
             sheet.deleteRow(row); // Delete the row from the order page
@@ -882,9 +888,10 @@ function moveRow(e)
           }
           else if (value == "Partial") // The order status is being set to partial
           {
+            rowValues[3] = true;
             rowValues[4] = 'BO'; // Set the value in the back order column to 'BO'
             spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues); // Move the row of values to the completed page
-            sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]); // Clear the invoice values, and set the status
+            sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]).offset(0, -8, 1, 1).check(); // Clear the invoice values, and set the status
             deleteBackOrderedItems(rowValues[2], spreadsheet);
           }
         }
@@ -901,6 +908,16 @@ function moveRow(e)
           }
            
           sheet.getRange(row, 1, 1, numCols).setBackground((sheet.getRange(row, 2).getBackground() === 'white') ? 'white' : '#e8f0fe');
+        }
+      }
+      else if (col == 4) // The approval of an order has changed
+      {
+        if (isBlank(range.offset(0, 8).getValue())) // Is this order an inital order?
+        {
+          const approval = range.isChecked();
+          const approvedOrderNumber = range.offset(0, -1).getValue();
+          const ioSheet = spreadsheet.getSheetByName('I/O')
+          ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1).map((ordNum, o) => (ordNum[0] == approvedOrderNumber) ? ioSheet.getRange(o + 3, 4).setValue(approval) : null);
         }
       }
     }
