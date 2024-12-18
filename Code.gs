@@ -9,17 +9,20 @@ function onChange(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isBackOrderItems = 5;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isBackOrderItems = 5, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
+      nRows = sheets[sheet].getLastRow();
+      nCols = sheets[sheet].getLastColumn();
+
       info = [
-        sheets[sheet].getLastRow(),
-        sheets[sheet].getLastColumn(),
+        nRows,
+        nCols,
         sheets[sheet].getMaxRows(),
         sheets[sheet].getMaxColumns(),
-        sheets[sheet].getSheetValues(1, 1, 1, sheets[sheet].getLastColumn()).flat().includes('Created by User'),
-        sheets[sheet].getSheetValues(1, 1, 1, sheets[sheet].getLastColumn()).flat().includes('Qty Original Ordered')
+        (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')      : false, // There is a sheet with no rows and no columns
+        (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered') : false
       ]
 
       // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
@@ -63,7 +66,49 @@ function onEdit(e)
 }
 
 /**
- * This function allows the user to add items from the P/O or B/O page to the relevant transfer page.
+ * This function checks to see if a user is moving a row from one sheet to another.
+ * 
+ * @param {Event Object} e : The event object.
+ */
+function onOpen(e)
+{
+  const spreadsheet = e.source;
+  const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
+  const areTriggersCreated = spreadsheet.getSheetByName('Triggers').getRange(1, 1).isChecked();
+  const currentTransferSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(" ").shift();
+
+  if (isBlank(newSpreadsheetUrl) && (new Date().getFullYear() + 1).toString() === currentTransferSheetYear && !areTriggersCreated)
+    SpreadsheetApp.getUi().createMenu('Create Triggers').addItem('Create Triggers', 'triggers_CreateAll').addToUi();
+}
+
+/**
+ * This function checks to see if a user is moving a row from one sheet to another.
+ * 
+ * @param {Event Object} e : The event object.
+ */
+function installedOnOpen(e)
+{
+  const today = new Date();
+  const year = (today.getFullYear() + 1).toString();
+  const spreadsheet = e.source;
+  const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
+  const areTriggersCreated = spreadsheet.getSheetByName('Triggers').getRange(1, 1).isChecked();
+  const currentTransferSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(" ").shift();
+
+  if (!isBlank(newSpreadsheetUrl))
+  {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('Add selected rows to new Lodge Tracker').addItem('Add selected rows to new Lodge Tracker', 'addSelectedRowsToNewLodgeTracker').addToUi();
+    ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 2.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+  }
+  else if (year !== currentTransferSheetYear) // If it is september or later and the current spreadsheet is not "next years" spreadsheet
+    if (today.getMonth() > 7) SpreadsheetApp.getUi().createMenu('Create ' + year + ' Lodge Tracker').addItem('Create ' + year + ' Lodge Tracker', 'createNewLodgeTracker').addToUi();
+  else if (!areTriggersCreated)
+    SpreadsheetApp.getUi().createMenu('Create Triggers').addItem('Create Triggers', 'triggers_CreateAll').addToUi();
+}
+
+/**
+ * This function allows the user to add items from the I/O or B/O page to the relevant transfer page.
  * 
  * @author Jarren Ralf
  */
@@ -121,7 +166,7 @@ function addItemsToTransferSheet()
         {
           fromLocation = 'Richmond';
 
-          response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+          response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
 
           // Process the user's response.
           if (response.getSelectedButton() == ui.Button.OK)
@@ -200,7 +245,7 @@ function addItemsToTransferSheet()
           break;
       }
 
-      if (sheetName == 'B/O' && fromLocation != undefined && toLocation != undefined)
+      if (fromLocation != undefined && toLocation != undefined && (sheetName == 'B/O' || sheetName == 'I/O'))
       {
         activeSheet.getFilter().remove(); // Remove the filter
         activeSheet.getRange(2, 1, 1, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
@@ -209,16 +254,210 @@ function addItemsToTransferSheet()
         const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
         activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
       }
+    }
+  }
+}
 
-      if (sheetName == 'I/O' && fromLocation != undefined && toLocation != undefined)
+/**
+ * This function takes all of the selected rows on the current lodge tracker sheet and it transfers them to the new one.
+ * 
+ * @author Jarren Ralf
+ */
+function addSelectedRowsToNewLodgeTracker()
+{
+  const currentSpreadsheet = SpreadsheetApp.getActive();
+  const activeSheet = currentSpreadsheet.getActiveSheet();
+  const sheetName = activeSheet.getSheetName()
+
+  if (sheetName !== 'LODGE ORDERS' && sheetName !== 'GUIDE ORDERS')
+    SpreadsheetApp.getUi().alert('You may only select orders from the LODGE ORDERS or GUIDE ORDERS sheet.');
+  else
+  {
+    const numCols = activeSheet.getLastColumn();
+    const firstRows = [], lastRows = [], numRows = [];
+    
+    const itemValues = currentSpreadsheet.getActiveRangeList().getRanges().map((activeRange, r) => {
+      firstRows.push(activeRange.getRow())
+      lastRows.push(activeRange.getLastRow())
+        numRows.push(lastRows[r] - firstRows[r] + 1)
+      return activeSheet.getSheetValues(firstRows[r], 1, numRows[r], numCols)
+    })
+
+    if (Math.min(...firstRows) > 2 && Math.max( ...lastRows) <= activeSheet.getLastRow()) // If the user has not selected an item, alert them with an error message
+    {   
+      const itemVals = [].concat.apply([], itemValues); // Concatenate all of the item values as a 2-D array
+      const numOrders = itemVals.length;
+      var url = currentSpreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
+      const destinationSheet = SpreadsheetApp.openByUrl(url).getSheetByName(activeSheet.getSheetName());
+      const lastRow = destinationSheet.getLastRow();
+
+      destinationSheet.getRange((lastRow > 2) ? lastRow + 1 : 3, 1, numOrders, numCols)
+        .setNumberFormats(new Array(numOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@'])).setValues(itemVals);
+
+      firstRows.sort((a,b) => b - a).map((row, r) => {Logger.log(row); Logger.log(numRows[r]); activeSheet.deleteRows(row, numRows[r]);}); // Delete the rows that were moved over to the new tracker
+      const sheetId = destinationSheet.getSheetId()
+      url += '?gid=' + sheetId + '#gid=' + sheetId;
+      SpreadsheetApp.flush()
+
+      SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + (new Date().getFullYear() + 1) + ' Lodge Order Tracking 2.0</a></p>')
+        .setWidth(250).setHeight(50), 'New Lodge Tracker');
+    }
+    else
+      SpreadsheetApp.getUi().alert('Please select an order from the list.');
+  }
+}
+
+/**
+ * This function allows the user to add order from the LODGE ORDERS or GUIDE ORDERS page to the relevant transfer sheet.
+ * 
+ * @author Jarren Ralf
+ */
+function addOrdersToTransferSheet()
+{
+  const activeSheet = SpreadsheetApp.getActiveSheet();
+  const firstRows = [], lastRows = [], numRows = [], values = [], name = [], ordNum = [], invNum = [];
+    
+  currentSpreadsheet.getActiveRangeList().getRanges().map((activeRange, r) => {
+    firstRows.push(activeRange.getRow())
+      lastRows.push(activeRange.getLastRow())
+      numRows.push(lastRows[r] - firstRows[r] + 1)
+        values.push(activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
+          name.push(...values.map(v => v[4]))
+        ordNum.push(...values.map(v => v[0]))
+        invNum.push(...values.map(v => v[9]))
+  })
+
+  if (Math.min(...firstRows) < 3)
+    Browser.msgBox('Please select items from the list.')
+  else
+  {
+    const spreadsheet = SpreadsheetApp.getActive()
+    const sheetName = activeSheet.getSheetName();
+    const today = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(), 'dd MMM yyyy');
+    var row = 0, numOrders = 0, sheet, itemValues, fromLocation, toLocation, url;
+
+    var ui = SpreadsheetApp.getUi();
+
+    var response = ui.prompt('Which PNT location are you shipping FROM?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+
+    // Process the user's response.
+    if (response.getSelectedButton() == ui.Button.OK)
+    {
+      var textResponse = response.getResponseText().toUpperCase();
+
+      if (textResponse == 'RICH')
       {
-        activeSheet.getFilter().remove(); // Remove the filter
-        activeSheet.getRange(2, 1, 1, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
-        SpreadsheetApp.flush();
+        fromLocation = 'Richmond';
 
-        const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
-        activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
+        response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+
+        // Process the user's response.
+        if (response.getSelectedButton() == ui.Button.OK)
+        {
+          textResponse = response.getResponseText().toUpperCase();
+
+          if (textResponse == 'PARKS')
+            toLocation = 'Parskville'
+          else if (textResponse == 'PR')
+            toLocation = 'Rupert'
+          else
+            ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+        }
+        else // The user has clicked on CLOSE or CANCEL
+          return;
       }
+      else if (textResponse == 'PARKS')
+      {
+        toLocation = 'Richmond';
+        fromLocation = 'Parksville';
+      }
+      else if (textResponse == 'PR')
+      {
+        toLocation = 'Richmond';
+        fromLocation = 'Rupert';
+      }
+      else
+        ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+    }
+    else // The user has clicked on CLOSE or CANCEL
+      return;
+
+    switch (fromLocation)
+    {
+      case 'Richmond':
+
+        switch (toLocation)
+        {
+          case 'Parskville':
+            url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
+            sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+            itemValues = items.map((_,idx) => 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Eryn (Lodge Order)']) 
+            row = sheet.getLastRow() + 1;
+            numOrders = itemValues.length;
+            sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
+            applyFullRowFormatting(sheet, row, numOrders, false)
+            break;
+          case 'Rupert':
+            url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
+            sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+            itemValues = items.map((_,idx) => 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Doug (Lodge Order)'])
+            row = sheet.getLastRow() + 1;
+            numOrders = itemValues.length;
+            sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
+            applyFullRowFormatting(sheet, row, numOrders, false)
+            break;
+        }
+        break;
+      case 'Parksville':
+        url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
+        sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+        itemValues = items.map((_,idx) => [today, 'Lodge\nTracker', '', ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Scott (Lodge Order)']) 
+        row = sheet.getLastRow() + 1;
+        numOrders = itemValues.length;
+        sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
+        applyFullRowFormatting(sheet, row, numOrders, true)
+        break;
+      case 'Rupert':
+        url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
+        sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+        itemValues = items.map((_,idx) => [today, 'Lodge\nTracker', '', ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Scott (Lodge Items)']) 
+        row = sheet.getLastRow() + 1;
+        numOrders = itemValues.length;
+        sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
+        applyFullRowFormatting(sheet, row, numOrders, true)
+        break;
+    }
+
+    if (fromLocation != undefined && toLocation != undefined && (sheetName == 'LODGE ORDERS' || sheetName == 'GUIDE ORDERS' || sheetName == 'LODGE COMPLETED' || sheetName == 'GUIDE COMPLETED'))
+    {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// MAKE THIS WORK
+      // SpreadsheetApp.flush();
+      // var runText, runStart, runEnd, runStyle, previousText, newText, fullText, richTextBuilder;
+      // const newText = 'Shipping from ' + fromLocation + ' to ' + toLocation;
+      // const newTextLength = newText.length;
+      // const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
+      // numRows.map((nRows, r) => {
+      //   activeSheet.getRange(firstRows[r], 11, nRows, 1).getRichTextValues().map(richText => {
+      //     runText = richText[0].getRuns().map(run => {
+      //       runStart.push(run.getStartOffset());
+      //       runEnd.push(run.getEndOffsetInclusive());
+      //       runStyle.push(run.getTextStyle());
+      //       return run.getText();
+      //     })
+
+      //     previousText = runText.join('') + '\n'
+      //     fullText = previousText + newText;
+      //     richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText)
+      //     runStart.push(run.getStartOffset());
+      //     runEnd.push(fullText.length);
+      //     runStyle.push(run.getTextStyle());
+      //     runStyle.map((textStyle, t) => richTextBuilder.setTextStyle(runStart[t], runEnd[t], textStyle))
+
+      //   });
+      //   rng.offset(0, 12 - rng.getColumn(), nRows, 1).setRichTextValues(new Array(nRows).fill([linkToTransferSheet]))
+      // });
     }
   }
 }
@@ -271,13 +510,43 @@ function applyFullRowFormatting(sheet, row, numRows, isItemsToRichmondPage)
 }
 
 /**
- * This function creates the onChange trigger that handles all of the imported files.
+ * This function creates a new Lodge Tracker for the next season.
  * 
  * @author Jarren Ralf
  */
-function createTriggers()
+function createNewLodgeTracker()
 {
-  ScriptApp.newTrigger('onChange').forSpreadsheet(SpreadsheetApp.getActive()).onChange().create();
+  if (Session.getActiveUser().getEmail() !== 'jarrencralf@gmail.com') 
+    Browser.msgBox('Please ask Jarren to create the new spreadsheet so the full functionality of the Lodge Transfer sheet is preserved.')
+  else
+  {
+    const year = new Date().getFullYear() + 1
+    const currentSpreadsheet = SpreadsheetApp.getActive();
+    const newSpreadsheet = currentSpreadsheet.copy(year + ' Lodge Order Tracking 2.0')
+    const url = newSpreadsheet.getUrl();
+    currentSpreadsheet.getSheetByName('New Tracker').getRange(1, 1).setValue(url);
+    newSpreadsheet.getSheetByName('Triggers').getRange(1, 1).uncheck();
+    newSpreadsheet.addEditors(currentSpreadsheet.getEditors().map(editor => editor.getEmail())).getSheetByName('New Tracker').clear() // Add edditors and remove old url
+    const lodgeOrdersSheet = newSpreadsheet.getSheetByName('LODGE ORDERS')
+    const guideOrdersSheet = newSpreadsheet.getSheetByName('GUIDE ORDERS')
+    const lodgeCompletedSheet = newSpreadsheet.getSheetByName('LODGE COMPLETED')
+    const guideCompletedSheet = newSpreadsheet.getSheetByName('GUIDE COMPLETED')
+    const cancelledSheet = newSpreadsheet.getSheetByName('CANCELLED')
+    const boSheet = newSpreadsheet.getSheetByName('B/O')
+    const ioSheet = newSpreadsheet.getSheetByName('I/O')
+    const poSheet = newSpreadsheet.getSheetByName('P/O')
+    
+    lodgeOrdersSheet.getRange(1, 1).setValue(year + ' Lodge Orders').offset(2, 0, lodgeOrdersSheet.getMaxRows() - 2, lodgeOrdersSheet.getLastColumn()).clearContent()
+    guideOrdersSheet.getRange(1, 1).setValue(year + ' Guide Orders').offset(2, 0, guideOrdersSheet.getMaxRows() - 2, guideOrdersSheet.getLastColumn()).clearContent()
+    lodgeCompletedSheet.getRange(1, 1).setValue(year + ' Completed Lodge Orders').offset(2, 0, lodgeCompletedSheet.getMaxRows() - 2, lodgeCompletedSheet.getLastColumn()).clearContent()
+    guideCompletedSheet.getRange(1, 1).setValue(year + ' Completed Guide Orders').offset(2, 0, guideCompletedSheet.getMaxRows() - 2, guideCompletedSheet.getLastColumn()).clearContent()
+    cancelledSheet.getRange(1, 1).setValue(year + ' Cancelled Orders').offset(2, 0, cancelledSheet.getMaxRows() - 2, cancelledSheet.getLastColumn()).clearContent()
+    boSheet.getRange(1, 1).setValue(year + ' Back Orders').offset(2, 0, boSheet.getMaxRows() - 2, boSheet.getLastColumn()).clearContent()
+    ioSheet.getRange(1, 1).setValue(year + '  Initial Items Ordered').offset(2, 0, ioSheet.getMaxRows() - 2, ioSheet.getLastColumn()).clearContent()
+    poSheet.getRange(1, 1).setValue(year + ' Purchase Orders').offset(2, 0, poSheet.getMaxRows() - 2, poSheet.getLastColumn()).clearContent()
+    SpreadsheetApp.flush();
+    SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 2.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+  }
 }
 
 /**
@@ -293,9 +562,6 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
   const ioSheet = spreadsheet.getSheetByName('I/O');
   boSheet.getFilter().remove(); // Remove the filter
   ioSheet.getFilter().remove();
-        
-
-  Logger.log('Array.isArray(orderNumber): ' + Array.isArray(orderNumber))
 
   if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
   {
@@ -654,6 +920,30 @@ function removeDashesFromSku(sku)
 }
 
 /**
+ * This function creates all of the triggers for this spreadsheet.
+ * 
+ * @author Jarren Ralf
+ */
+function triggers_CreateAll()
+{
+  const spreadsheet = SpreadsheetApp.getActive()
+  ScriptApp.newTrigger('onChange').forSpreadsheet(spreadsheet).onChange().create();
+  ScriptApp.newTrigger('installedOnOpen').forSpreadsheet(spreadsheet).onOpen().create();
+  spreadsheet.getSheetByName('Triggers').getRange(1, 1).check();
+}
+
+/**
+ * This function deletes all of the triggers for this spreadsheet.
+ * 
+ * @author Jarren Ralf
+ */
+function triggers_DeleteAll()
+{
+  ScriptApp.getProjectTriggers().map(trigger => ScriptApp.deleteTrigger(trigger));
+  SpreadsheetApp.getActive().getSheetByName('Triggers').getRange(1, 1).uncheck();
+}
+
+/**
  * This function handles the import of an order entry order that may contain back ordered items.
  * 
  * @param {String[][]}     items    : A list of items on the order that was imported.
@@ -700,7 +990,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
           removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
     });
 
-    var itemSheet = spreadsheet.getSheetByName('B/O'); 
+    var itemSheet = spreadsheet.getSheetByName('B/O').activate(); 
   }
   else 
   {
@@ -709,7 +999,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
           removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
     });
 
-    var itemSheet = spreadsheet.getSheetByName('I/O'); 
+    var itemSheet = spreadsheet.getSheetByName('I/O').activate(); 
   }
 
   const numRows = itemSheet.getLastRow() - 2;
@@ -813,7 +1103,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const lodgeCustomerNames = lodgeCustomerSheet.getSheetValues(3, 2, lodgeCustomerSheet.getLastRow() - 2, 2);
   const charterGuideCustomerNames = charterGuideCustomerSheet.getSheetValues(3, 2, charterGuideCustomerSheet.getLastRow() - 2, 2);
 
-  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
+  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS').activate();
   const charterGuideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
   const lodgeCompletedSheet = spreadsheet.getSheetByName('LODGE COMPLETED');
   const charterGuideCompletedSheet = spreadsheet.getSheetByName('GUIDE COMPLETED');
@@ -828,19 +1118,45 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const lodgeCompleted = (numCompletedLodgeOrders > 0) ? lodgeCompletedSheet.getSheetValues(3, 12, numCompletedLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
   const charterGuideCompleted = (numCompletedCharterGuideOrders > 0) ? charterGuideCompletedSheet.getSheetValues(3, 12, numCompletedCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
 
+  const currentYear = new Date().getFullYear().toString()
+  const lastYear = new Date().getFullYear().toString()
+  const lodgeSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+
+  if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
+    var includeLastYearsFinalQuarterOrders = true;
+
+  if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
+    var isCurrentLodgeSeasonYear = true;
+
   const newLodgeOrders = (isCompletedOrders) ? // If true, then the import is a set of invoiced and completed orders
-    allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && order[dateIdx].substring(6) === '2024' && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
+    allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
+      ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
+        (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
+        || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
+      && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
       return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getBoStatus(order[isOrderCompleteIdx]), getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Lodge Completed
     }) :
-    allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && order[dateIdx].substring(6) === '2024' && order[isOrderCompleteIdx] === 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
+    allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
+      ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
+        (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
+        || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
+      && order[isOrderCompleteIdx] === 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
       return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Lodge Orders
   });
 
   const newCharterGuideOrders = (isCompletedOrders) ?  // If true, then the import is a set of invoiced and completed orders
-    allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) && order[dateIdx].substring(6) === '2024' && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
+    allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
+      ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
+        (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
+        || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
+      && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
       return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getBoStatus(order[isOrderCompleteIdx]), getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Charter & Guide Completed
     }) :
-    allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) && order[dateIdx].substring(6) === '2024' && order[isOrderCompleteIdx] === 'No' && !charterGuideOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
+    allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
+      ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
+        (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
+        || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
+      && order[isOrderCompleteIdx] === 'No' && !charterGuideOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
       return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Charter & Guide Orders
   });
 
@@ -888,7 +1204,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   {
     var isLodgeOrderComplete, isCharterGuideOrderComplete;
     SpreadsheetApp.flush();
-    const completedLodgeOrders = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 13)
+    const completedLodgeOrderNumbers = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 13)
       .filter(ord => ord[12] === 'Completed')
       .map(ord => ord[0]).flat()
       .filter(ordNum => ordNum !== ''); 
@@ -897,7 +1213,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
       .filter(currentOrd => {
 
-        isLodgeOrderComplete = completedLodgeOrders.includes(currentOrd[2]);
+        isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]);
 
         if (isLodgeOrderComplete)
           Logger.log(currentOrd);
@@ -910,7 +1226,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     if (numCurrentLodgeOrders < numLodgeOrders)
       lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, numCurrentLodgeOrders, 15).setValues(currentLodgeOrders);
 
-    const completedCharterGuideOrders = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 13)
+    const completedCharterGuideOrderNumbers = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 13)
       .filter(ord => ord[14] === 'Completed')
       .map(ord => ord[2]).flat()
       .filter(ordNum => ordNum !== '');
@@ -919,7 +1235,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
       .filter(currentOrd => {
 
-        isCharterGuideOrderComplete = completedCharterGuideOrders.includes(currentOrd[2]);
+        isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]);
 
         if (isCharterGuideOrderComplete)
           Logger.log(currentOrd);
@@ -932,10 +1248,73 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     if (numCurrentCharterGuideOrders < numCharterGuideOrders)
       charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 15).setValues(currentCharterGuideOrders);
   }
-  else
+  else // Cancelled Orders (if ANY)
   {
-    var numCurrentLodgeOrders = numLodgeOrders;
-    var numCurrentCharterGuideOrders = numCharterGuideOrders;
+    var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [], today = new Date();
+    SpreadsheetApp.flush();
+    const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => ordNum !== ''); 
+    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
+      .filter(currentOrd => {
+
+        isLodgeOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
+
+        if (isLodgeOrderCancelled)
+        {
+          currentOrd.push(today) // Set the cancelled date as today
+          currentOrd[10] = (isBlank(currentOrd[10])) ? 'This order was automatically cancelled' : 'This order was automatically cancelled\n' + currentOrd[10];
+          cancelledOrders.push(currentOrd)
+        }
+          
+        return !isLodgeOrderCancelled;
+    });
+
+    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
+      .filter(currentOrd => {
+
+        isCharterGuideOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
+
+        if (isCharterGuideOrderCancelled)
+        {
+          currentOrd.push(today) // Set the cancelled date as today
+          currentOrd[10] = (isBlank(currentOrd[10])) ? 'This order was automatically cancelled' : 'This order was automatically cancelled\n' + currentOrd[10];
+          cancelledOrders.push(currentOrd)
+        }
+          
+        return !isCharterGuideOrderCancelled;
+    });
+
+    Logger.log('currentLodgeOrders:')
+    Logger.log(currentLodgeOrders)
+
+    Logger.log('currentCharterGuideOrders:')
+    Logger.log(currentCharterGuideOrders)
+
+    Logger.log('cancelledOrders:')
+    Logger.log(cancelledOrders)
+
+    var numCancelledOrders = cancelledOrders.length;
+    var numCurrentLodgeOrders = currentLodgeOrders.length;
+    var numCurrentCharterGuideOrders = currentCharterGuideOrders.length;
+
+    if (numCancelledOrders > 0)
+    {
+      const cancelledSheet = spreadsheet.getSheetByName('CANCELLED')
+      cancelledSheet.getRange(cancelledSheet.getLastRow() + 1, 1, numCancelledOrders, 16)
+        .setNumberFormats(new Array(numCancelledOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy']))
+        .setValues(cancelledOrders)
+      Logger.log('The following orders were removed from the tracker and placed on the CANCELLED page because they were NOT found in OrderEntry:')
+      Logger.log(cancelledOrders)
+    }
+
+    if (numCurrentLodgeOrders < numLodgeOrders)
+      lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, numCurrentLodgeOrders, 15).setValues(currentLodgeOrders);
+
+    Logger.log('numCurrentCharterGuideOrders: ' + numCurrentCharterGuideOrders)
+    Logger.log('numCharterGuideOrders: ' + numCharterGuideOrders)
+    Logger.log('numCurrentCharterGuideOrders < numCharterGuideOrders: ' + (numCurrentCharterGuideOrders < numCharterGuideOrders))
+
+    if (numCurrentCharterGuideOrders < numCharterGuideOrders)
+      charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 15).setValues(currentCharterGuideOrders);
   }
 
   spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
