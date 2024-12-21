@@ -55,9 +55,16 @@ function onChange(e)
  */
 function onEdit(e)
 {
+  const spreadsheet = e.source;
+  const sheet = spreadsheet.getActiveSheet();
+  const sheetName = sheet.getSheetName();
+
   try
   {
-    moveRow(e)
+    if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
+      managePriceChange(e, spreadsheet)
+    else (sheetName.split(" ").pop() === 'ORDERS')
+      moveRow(e, sheet, spreadsheet)
   }
   catch (error)
   {
@@ -128,7 +135,7 @@ function addItemsToTransferSheet()
        sku.push(...values.map(v => v[3]))
        qty.push(...values.map(v => v[2]))
       name.push(...values.map(v => v[0]))
-    ordNum.push(...values.map(v => v[8]))
+    ordNum.push(...values.map(v => v[8])) ////// Fix this????????????????????????????????????????????????????????????
   }
 
   var firstRow = Math.min(...firstRows); // This is the smallest starting row number out of all active ranges
@@ -253,6 +260,8 @@ function addItemsToTransferSheet()
 
         const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
         activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
+
+        spreadsheet.toast('Click on the link and and make the necessary changes to the Transfer sheet', 'Item(s) Added to Transfer Sheet', -1)
       }
     }
   }
@@ -315,16 +324,13 @@ function addSelectedRowsToNewLodgeTracker()
 function addOrdersToTransferSheet()
 {
   const activeSheet = SpreadsheetApp.getActiveSheet();
-  const firstRows = [], lastRows = [], numRows = [], values = [], name = [], ordNum = [], invNum = [];
+  const firstRows = [], lastRows = [], numRows = [], values = [];
     
-  currentSpreadsheet.getActiveRangeList().getRanges().map((activeRange, r) => {
+  SpreadsheetApp.getActive().getActiveRangeList().getRanges().map((activeRange, r) => {
     firstRows.push(activeRange.getRow())
-      lastRows.push(activeRange.getLastRow())
+     lastRows.push(activeRange.getLastRow())
       numRows.push(lastRows[r] - firstRows[r] + 1)
-        values.push(activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
-          name.push(...values.map(v => v[4]))
-        ordNum.push(...values.map(v => v[0]))
-        invNum.push(...values.map(v => v[9]))
+       values.push(...activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
   })
 
   if (Math.min(...firstRows) < 3)
@@ -391,8 +397,8 @@ function addOrdersToTransferSheet()
           case 'Parskville':
             url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-            itemValues = items.map((_,idx) => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Eryn (Lodge Order)']) 
+            itemValues = values.map(value => 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[4] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Eryn (Lodge Order)']) 
             row = sheet.getLastRow() + 1;
             numOrders = itemValues.length;
             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
@@ -401,8 +407,8 @@ function addOrdersToTransferSheet()
           case 'Rupert':
             url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-            itemValues = items.map((_,idx) => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Doug (Lodge Order)'])
+            itemValues = values.map(value => 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[4] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Doug (Lodge Order)'])
             row = sheet.getLastRow() + 1;
             numOrders = itemValues.length;
             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
@@ -413,7 +419,9 @@ function addOrdersToTransferSheet()
       case 'Parksville':
         url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-        itemValues = items.map((_,idx) => [today, 'Lodge\nTracker', '', ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Scott (Lodge Order)']) 
+        itemValues = values.map(value => 
+          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[4] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Order)']
+        ) 
         row = sheet.getLastRow() + 1;
         numOrders = itemValues.length;
         sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
@@ -422,7 +430,9 @@ function addOrdersToTransferSheet()
       case 'Rupert':
         url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-        itemValues = items.map((_,idx) => [today, 'Lodge\nTracker', '', ordNum[idx] + ' for ' + name[idx] + ' - ' + ((isBlank(invNum[idx])) ? 'NOT INVOICED' : 'Inv# ' + invNum[idx]), 'ATTN: Scott (Lodge Items)']) 
+        itemValues = values.map(value => 
+          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[4] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Items)']
+        ) 
         row = sheet.getLastRow() + 1;
         numOrders = itemValues.length;
         sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
@@ -432,32 +442,31 @@ function addOrdersToTransferSheet()
 
     if (fromLocation != undefined && toLocation != undefined && (sheetName == 'LODGE ORDERS' || sheetName == 'GUIDE ORDERS' || sheetName == 'LODGE COMPLETED' || sheetName == 'GUIDE COMPLETED'))
     {
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// MAKE THIS WORK
-      // SpreadsheetApp.flush();
-      // var runText, runStart, runEnd, runStyle, previousText, newText, fullText, richTextBuilder;
-      // const newText = 'Shipping from ' + fromLocation + ' to ' + toLocation;
-      // const newTextLength = newText.length;
-      // const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
-      // numRows.map((nRows, r) => {
-      //   activeSheet.getRange(firstRows[r], 11, nRows, 1).getRichTextValues().map(richText => {
-      //     runText = richText[0].getRuns().map(run => {
-      //       runStart.push(run.getStartOffset());
-      //       runEnd.push(run.getEndOffsetInclusive());
-      //       runStyle.push(run.getTextStyle());
-      //       return run.getText();
-      //     })
+      SpreadsheetApp.flush();
+      const additionalTransferSheetHyperlinkText = '\nShipping from ' + fromLocation + ' to ' + toLocation;
+      var fullText, fullTextLength, richText_Notes_Runs, numRuns = 0, rng;
 
-      //     previousText = runText.join('') + '\n'
-      //     fullText = previousText + newText;
-      //     richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText)
-      //     runStart.push(run.getStartOffset());
-      //     runEnd.push(fullText.length);
-      //     runStyle.push(run.getTextStyle());
-      //     runStyle.map((textStyle, t) => richTextBuilder.setTextStyle(runStart[t], runEnd[t], textStyle))
+      numRows.map((nRows, r) => {
+        rng = activeSheet.getRange(firstRows[r], 11, nRows, 1);
+        richText_Notes = rng.getRichTextValues().map(note_RichText => {
+          fullText = note_RichText[0].getText()
+          fullTextLength = fullText.length;
+          richText_Notes_Runs = note_RichText[0].getRuns().map(run => [run.getStartIndex(), run.getEndIndex(), run.getTextStyle()]);
+          numRuns = richText_Notes_Runs.length;
 
-      //   });
-      //   rng.offset(0, 12 - rng.getColumn(), nRows, 1).setRichTextValues(new Array(nRows).fill([linkToTransferSheet]))
-      // });
+          if (!isBlank(fullText))
+            for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + additionalTransferSheetHyperlinkText); i < numRuns; i++)
+              richTextBuilder.setTextStyle(richText_Notes_Runs[i][0], richText_Notes_Runs[i][1], richText_Notes_Runs[i][2])
+          else 
+            return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()]
+          
+          return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + additionalTransferSheetHyperlinkText.length, url + '&range=B' + row).build()];
+        });
+
+        rng.setRichTextValues(richText_Notes)
+      });
+
+      spreadsheet.toast('Click on the link and and make the necessary changes to the Transfer sheet', 'Order(s) Added to Transfer Sheet', -1)
     }
   }
 }
@@ -823,11 +832,12 @@ function isNumber(num)
 }
 
 /**
- * This function moves the selected row from the Lodge or Guide order page to the completed page.
+ * This function manages the price changes on the Lead and Bait Cost & Pricing sheets.
  * 
  * @param {Event Object} e : The event object.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  */
-function moveRow(e)
+function managePriceChange(e, spreadsheet)
 {
   const range = e.range;
   const row = range.rowStart;
@@ -835,89 +845,118 @@ function moveRow(e)
 
   if (row == range.rowEnd && col == range.columnEnd) // Only look at a single cell edit
   {
-    const spreadsheet = e.source;
-    const sheet = spreadsheet.getActiveSheet();
+    if (row > 2) // Not a header
+    {
+      if (col === 8 || col === 9) // Cost is changing
+      {
+        const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
+        range.offset(0, 7 - col).setValue(formattedDate).offset(0, 5).uncheck().offset(0, 9).setValue('Yes');
+      }
+      else if (col === 12 && range.isChecked())
+        range.offset(0, 9).setValue('');
+    }
+  }
+}
+
+/**
+ * This function moves the selected row from the Lodge or Guide order page to the completed page.
+ * 
+ * @param {Event Object} e : The event object.
+ * @param {Sheet} sheet : The active sheet.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ */
+function moveRow(e, sheet, spreadsheet)
+{
+  const range = e.range;
+  const row = range.rowStart;
+  const col = range.columnStart;  
+
+  if (row == range.rowEnd && col == range.columnEnd) // Only look at a single cell edit
+  {
     const sheetNames = sheet.getSheetName().split(" ") // Split the sheet name, which will be used to distinguish between Logde and Guide page
 
-    if (sheetNames[1] == "ORDERS") // An edit is happening on one of the Order pages
+    if (sheetNames.pop() == "ORDERS") // An edit is happening on one of the Order pages
     {
       const numCols = sheet.getLastColumn()
 
-      if (col == numCols) // Order Status is changing
+      if (row > 2) // Not a header
       {
-        const value = e.value; 
-        const numCols = sheet.getLastColumn()
+        if (col == numCols) // Order Status is changing
+        {
+          const value = e.value; 
+          const numCols = sheet.getLastColumn()
 
-        if (value == 'Updated')
-        {
-          range.setValue('')
-          sheet.getRange(row, 5).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00')
-        }
-        else if (value == 'Picking')
-        {
-          const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
+          if (value == 'Updated')
+          {
+            range.setValue('')
+            sheet.getRange(row, 5).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00')
+          }
+          else if (value == 'Picking')
+          {
+            const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
 
-          if (!rowValues[3]) // Order is not approved
-          {
-            const ui = SpreadsheetApp.getUi()
-            ui.alert('Order NOT Approved', 'You have started picking an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
-              sheet.getRange(row, 2).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+            if (!rowValues[3]) // Order is not approved
+            {
+              const ui = SpreadsheetApp.getUi()
+              ui.alert('Order NOT Approved', 'You have started picking an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
+                sheet.getRange(row, 2).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+            }
           }
-        }
-        else
-        {
-          const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
-          const timeZone = spreadsheet.getSpreadsheetTimeZone(); // Set the timezone
+          else
+          {
+            const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
+            const timeZone = spreadsheet.getSpreadsheetTimeZone(); // Set the timezone
 
-          rowValues[0] = Utilities.formatDate(rowValues[0], timeZone, 'MMM dd, yyyy'); // Set the format of the order date
-          rowValues.push(Utilities.formatDate(     new Date(), timeZone, 'MMM dd, yyyy')); // Set the current time for the completion date
+            rowValues[0] = Utilities.formatDate(rowValues[0], timeZone, 'MMM dd, yyyy'); // Set the format of the order date
+            rowValues.push(Utilities.formatDate(     new Date(), timeZone, 'MMM dd, yyyy')); // Set the current time for the completion date
 
-          if (value == "Completed") // The order status is being set to complete 
-          {
-            rowValues[3] = true;
-            rowValues[4] = ''; // Clear the Back Order column
-            spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues) // Move the row of values to the completed page
-            sheet.deleteRow(row); // Delete the row from the order page
-            deleteBackOrderedItems(rowValues[2], spreadsheet);
-          }
-          else if (value == "Cancelled") // The order status is being set to cancelled 
-          { 
-            spreadsheet.getSheetByName("CANCELLED").appendRow(rowValues) // Move the row of values to the cancelled page
-            sheet.deleteRow(row); // Delete the row from the order page
-            deleteBackOrderedItems(rowValues[2], spreadsheet);
-          }
-          else if (value == "Partial") // The order status is being set to partial
-          {
-            rowValues[3] = true;
-            rowValues[4] = 'BO'; // Set the value in the back order column to 'BO'
-            spreadsheet.getSheetByName(sheetNames[0] +  " COMPLETED").appendRow(rowValues); // Move the row of values to the completed page
-            sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]).offset(0, -8, 1, 1).check(); // Clear the invoice values, and set the status
-            deleteBackOrderedItems(rowValues[2], spreadsheet);
+            if (value == "Completed") // The order status is being set to complete 
+            {
+              rowValues[3] = true;
+              rowValues[4] = ''; // Clear the Back Order column
+              spreadsheet.getSheetByName(sheetNames.pop() +  " COMPLETED").appendRow(rowValues) // Move the row of values to the completed page
+              sheet.deleteRow(row); // Delete the row from the order page
+              deleteBackOrderedItems(rowValues[2], spreadsheet);
+            }
+            else if (value == "Cancelled") // The order status is being set to cancelled 
+            { 
+              spreadsheet.getSheetByName("CANCELLED").appendRow(rowValues) // Move the row of values to the cancelled page
+              sheet.deleteRow(row); // Delete the row from the order page
+              deleteBackOrderedItems(rowValues[2], spreadsheet);
+            }
+            else if (value == "Partial") // The order status is being set to partial
+            {
+              rowValues[3] = true;
+              rowValues[4] = 'BO'; // Set the value in the back order column to 'BO'
+              spreadsheet.getSheetByName(sheetNames.pop() +  " COMPLETED").appendRow(rowValues); // Move the row of values to the completed page
+              sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]).offset(0, -8, 1, 1).check(); // Clear the invoice values, and set the status
+              deleteBackOrderedItems(rowValues[2], spreadsheet);
+            }
           }
         }
-      }
-      else if (col == 5) // Adding a Printed By name
-      {
-        if (range.getValue() !== '')
+        else if (col == 5) // Adding a Printed By name
         {
-          if (!range.offset(0, -1).isChecked())
+          if (range.getValue() !== '')
           {
-            const ui = SpreadsheetApp.getUi()
-            ui.alert('Order NOT Approved', 'You have printed an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
-              range.offset(0, -3).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+            if (!range.offset(0, -1).isChecked())
+            {
+              const ui = SpreadsheetApp.getUi()
+              ui.alert('Order NOT Approved', 'You have printed an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
+                range.offset(0, -3).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+            }
+            
+            sheet.getRange(row, 1, 1, numCols).setBackground((sheet.getRange(row, 2).getBackground() === 'white') ? 'white' : '#e8f0fe');
           }
-           
-          sheet.getRange(row, 1, 1, numCols).setBackground((sheet.getRange(row, 2).getBackground() === 'white') ? 'white' : '#e8f0fe');
         }
-      }
-      else if (col == 4) // The approval of an order has changed
-      {
-        if (isBlank(range.offset(0, 8).getValue())) // Is this order an inital order?
+        else if (col == 4) // The approval of an order has changed
         {
-          const approval = range.isChecked();
-          const approvedOrderNumber = range.offset(0, -1).getValue();
-          const ioSheet = spreadsheet.getSheetByName('I/O')
-          ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1).map((ordNum, o) => (ordNum[0] == approvedOrderNumber) ? ioSheet.getRange(o + 3, 4).setValue(approval) : null);
+          if (isBlank(range.offset(0, 8).getValue())) // Is this order an inital order?
+          {
+            const approval = range.isChecked();
+            const approvedOrderNumber = range.offset(0, -1).getValue();
+            const ioSheet = spreadsheet.getSheetByName('I/O')
+            ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1).map((ordNum, o) => (ordNum[0] == approvedOrderNumber) ? ioSheet.getRange(o + 3, 4).setValue(approval) : null);
+          }
         }
       }
     }
@@ -937,6 +976,34 @@ function removeDashesFromSku(sku)
 }
 
 /**
+ * This function sets the column widths of 4 of the sheets on this spreadsheet, namely the Order and Completed pages.
+ * 
+ * @author Jarren Ralf
+ */
+function setColumnWidths()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
+  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
+  const lodgeCompletedSheet = spreadsheet.getSheetByName('LODGE COMPLETED');
+  const guideCompletedSheet = spreadsheet.getSheetByName('GUIDE COMPLETED');
+  const widths = [80, 80, 68, 54, 80, 61, 200, 84, 120, 120, 300, 91, 63, 79, 70, 104];
+  const numCols = widths.length;
+
+  for (var c = 1; c < numCols; c++)
+  {
+    lodgeOrdersSheet.setColumnWidth(c, widths[c]);
+    guideOrdersSheet.setColumnWidth(c, widths[c]);
+    lodgeCompletedSheet.setColumnWidth(c, widths[c]);
+    guideCompletedSheet.setColumnWidth(c, widths[c]);
+  }
+
+  const lastColumnWidth = widths.shift()
+  lodgeCompletedSheet.setColumnWidth(c, lastColumnWidth);
+  guideCompletedSheet.setColumnWidth(c, lastColumnWidth);
+}
+
+/**
  * This function creates all of the triggers for this spreadsheet.
  * 
  * @author Jarren Ralf
@@ -944,8 +1011,9 @@ function removeDashesFromSku(sku)
 function triggers_CreateAll()
 {
   const spreadsheet = SpreadsheetApp.getActive()
-  ScriptApp.newTrigger('onChange').forSpreadsheet(spreadsheet).onChange().create();
+  ScriptApp.newTrigger('onChange').forSpreadsheet(spreadsheet). onChange().create();
   ScriptApp.newTrigger('installedOnOpen').forSpreadsheet(spreadsheet).onOpen().create();
+  ScriptApp.newTrigger('setColumnWidths').timeBased().atHour(7).everyDays(1).create()
   spreadsheet.getSheetByName('Triggers').getRange(1, 1).check();
 }
 
