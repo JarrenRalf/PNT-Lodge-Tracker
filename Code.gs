@@ -63,7 +63,7 @@ function onEdit(e)
   try
   {
     if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
-      managePriceChange(e, spreadsheet)
+      managePriceChange(e, sheetName, spreadsheet)
     else (sheetName.split(" ").pop() === 'ORDERS')
       moveRow(e, sheet, spreadsheet)
   }
@@ -845,26 +845,24 @@ function isNumber(num)
  * This function manages the price changes on the Lead and Bait Cost & Pricing sheets.
  * 
  * @param {Event Object} e : The event object.
+ * @param {String} sheetName : The name of the sheet that was editted.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  */
-function managePriceChange(e, spreadsheet)
+function managePriceChange(e, sheetName, spreadsheet)
 {
   const range = e.range;
   const row = range.rowStart;
   const col = range.columnStart;  
 
-  if (row == range.rowEnd && col == range.columnEnd) // Only look at a single cell edit
+  if (row == range.rowEnd && col == range.columnEnd && row > 2) // Only look at a single cell edit
   {
-    if (row > 2) // Not a header
+    if (col === 8 || col === 9) // Cost is changing
     {
-      if (col === 8 || col === 9) // Cost is changing
-      {
-        const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
-        range.offset(0, 7 - col).setValue(formattedDate).offset(0, 5).uncheck().offset(0, 9).setValue('Yes');
-      }
-      else if (col === 12 && range.isChecked())
-        range.offset(0, 9).setValue('');
+      const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
+      range.offset(0, 7 - col).setValue(formattedDate).offset(0, (sheetName !== 'Bait Cost & Pricing') ? 5 : 3).uncheck().offset(0, 9).setValue('Yes');
     }
+    else if (range.isChecked() && ((sheetName === 'Bait Cost & Pricing' && col === 10) || (sheetName === 'Lead Cost & Pricing' && col === 12)))
+      range.offset(0, 9).setValue('');
   }
 }
 
@@ -1499,13 +1497,14 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const numBaitItems = baitSheet.getLastRow() - 2;
   const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, leadSheet.getMaxColumns());
   const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, baitSheet.getMaxColumns());
+  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
+  const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
   const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages');
   const discounts = discountSheet.getSheetValues(2, 11, discountSheet.getLastRow() - 1, 5)
   const header = costData.shift();
   const itemNumber_InventoryCsv = header.indexOf('Item #')
   const cost = header.indexOf('Cost')
-  const formats = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@']
   var itemValues, discountValues, googleDescription, category, vendor;
 
   const leadItems = leadSheetRange.getValues().map(item => {
@@ -1550,49 +1549,49 @@ function updatePriceAndCostOfLeadAndFrozenBait()
     return item
   })
 
-  leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats)).setValues(leadItems)
+  leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats_leadSheet)).setValues(leadItems)
 
-  // const baitItems = baitSheetRange.getValues().map(item => {
-  //   itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
-  //   discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
+  const baitItems = baitSheetRange.getValues().map(item => {
+    itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
+    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
 
-  //   if (discountValues)
-  //   {
-  //     item[13] = Number(discountValues[1]);                                                    // Base Price
-  //     item[14] = Number(discountValues[2])/100;                                                // Guide Percent
-  //     item[15] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
-  //     item[16] = Number(discountValues[3])/100;                                                // Lodge Percent
-  //     item[17] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
-  //     item[18] = Number(discountValues[4])/100;                                                // Wholesale Percent
-  //     item[19] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
-  //   }
+    if (discountValues)
+    {
+      item[11] = Number(discountValues[1]);                                                    // Base Price
+      item[12] = Number(discountValues[2])/100;                                                // Guide Percent
+      item[13] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
+      item[14] = Number(discountValues[3])/100;                                                // Lodge Percent
+      item[15] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
+      item[16] = Number(discountValues[4])/100;                                                // Wholesale Percent
+      item[17] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
+    }
 
-  //   if (itemValues)
-  //   {
-  //     googleDescription = itemValues[1].split(' - ')
-  //     googleDescription.pop() // SKU
-  //     googleDescription.pop() // UoM
-  //     category = googleDescription.pop()
-  //     vendor = googleDescription.pop()
+    if (itemValues)
+    {
+      googleDescription = itemValues[1].split(' - ')
+      googleDescription.pop() // SKU
+      googleDescription.pop() // UoM
+      category = googleDescription.pop()
+      vendor = googleDescription.pop()
 
-  //     if (vendor !== item[2])
-  //     {
-  //       item[1] = vendor;
-  //       leadSheet.showColumns(2, 2)
-  //     }
+      if (vendor !== item[3])
+      {
+        item[2] = vendor;
+        leadSheet.showColumns(3, 2)
+      }
 
-  //     if (category !== item[4])
-  //     {
-  //       item[3] = category;
-  //       leadSheet.showColumns(4, 2);
-  //     }
+      if (category !== item[5])
+      {
+        item[4] = category;
+        leadSheet.showColumns(5, 2);
+      }
 
-  //     item[10] = itemValues[cost]; // Adagio Cost
-  //     item[12] = Number(item[13])/Number(itemValues[cost]) // Markup %
-  //   }
+      item[8] = itemValues[cost]; // Adagio Cost
+      item[10] = Number(item[11])/Number(itemValues[cost]) // Markup %
+    }
 
-  //   return item
-  // })
+    return item
+  })
 
-  // baitSheetRange.setNumberFormats(new Array(numBaitItems).fill(formats)).setValues(baitItems)
+  baitSheetRange.setNumberFormats(new Array(numBaitItems).fill(formats_baitSheet)).setValues(baitItems)
 }
