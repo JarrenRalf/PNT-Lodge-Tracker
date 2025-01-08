@@ -219,7 +219,7 @@ function addItemsToTransferSheet()
             case 'Parskville':
               url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
               sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Eryn (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], v[3], '']) 
+              itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Jesse (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], v[3], '']) 
               row = sheet.getLastRow() + 1;
               numRows = itemValues.length;
               sheet.getRange(row, 1, numRows, 8).setNumberFormat('@').setValues(itemValues)
@@ -307,7 +307,8 @@ function addSelectedRowsToNewLodgeTracker()
       destinationSheet.getRange((lastRow > 2) ? lastRow + 1 : 3, 1, numOrders, numCols)
         .setNumberFormats(new Array(numOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@'])).setValues(itemVals);
 
-      firstRows.sort((a,b) => b - a).map((row, r) => {Logger.log(row); Logger.log(numRows[r]); activeSheet.deleteRows(row, numRows[r]);}); // Delete the rows that were moved over to the new tracker
+      Logger.log('The following rows where delete:')
+      firstRows.sort((a,b) => b - a).map((row, r) => {Logger.log('row: ' + row); Logger.log('numRows[r]: ' + numRows[r]); activeSheet.deleteRows(row, numRows[r]);}); // Delete the rows that were moved over to the new tracker
       const sheetId = destinationSheet.getSheetId()
       url += '?gid=' + sheetId + '#gid=' + sheetId;
       SpreadsheetApp.flush()
@@ -402,7 +403,7 @@ function addOrdersToTransferSheet()
             url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
             itemValues = values.map(value => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Eryn (Lodge Order)']) 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Jesse (Lodge Order)']) 
             row = sheet.getLastRow() + 1;
             numOrders = itemValues.length;
             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
@@ -1588,13 +1589,13 @@ function updatePriceAndCostOfLeadAndFrozenBait()
       if (vendor !== item[3])
       {
         item[2] = vendor;
-        leadSheet.showColumns(3, 2)
+        baitSheet.showColumns(3, 2)
       }
 
       if (category !== item[5])
       {
         item[4] = category;
-        leadSheet.showColumns(5, 2);
+        baitSheet.showColumns(5, 2);
       }
 
       item[8] = itemValues[cost]; // Adagio Cost
