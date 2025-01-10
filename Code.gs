@@ -1517,9 +1517,9 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const header = costData.shift();
   const itemNumber_InventoryCsv = header.indexOf('Item #')
   const cost = header.indexOf('Cost')
-  var itemValues, discountValues, googleDescription, category, vendor;
+  var itemValues, discountValues, googleDescription, category, vendor, row;
 
-  const leadItems = leadSheetRange.getValues().map(item => {
+  const leadItems = leadSheetRange.getValues().map((item, rowIdx) => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
     discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
 
@@ -1554,7 +1554,9 @@ function updatePriceAndCostOfLeadAndFrozenBait()
         leadSheet.showColumns(5, 2);
       }
 
-      item[10] = itemValues[cost]; // Adagio Cost
+      row = rowIdx + 3;
+      item[ 9] = '=MAX(H' + row + ':I' + row + ')';        // New Cost
+      item[10] = itemValues[cost];                         // Adagio Cost
       item[12] = Number(item[13])/Number(itemValues[cost]) // Markup %
     }
 
