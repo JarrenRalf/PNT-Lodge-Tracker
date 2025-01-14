@@ -49,29 +49,29 @@ function onChange(e)
   }
 }
 
-/**
- * This function checks to see if a user is moving a row from one sheet to another.
- * 
- * @param {Event Object} e : The event object.
- */
-function onEdit(e)
-{
-  const spreadsheet = e.source;
-  const sheet = spreadsheet.getActiveSheet();
-  const sheetName = sheet.getSheetName();
+// /**
+//  * This function checks to see if a user is moving a row from one sheet to another.
+//  * 
+//  * @param {Event Object} e : The event object.
+//  */
+// function onEdit(e)
+// {
+//   const spreadsheet = e.source;
+//   const sheet = spreadsheet.getActiveSheet();
+//   const sheetName = sheet.getSheetName();
 
-  try
-  {
-    if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
-      managePriceChange(e, sheetName, spreadsheet)
-    else (sheetName.split(" ").pop() === 'ORDERS')
-      moveRow(e, sheet, spreadsheet)
-  }
-  catch (error)
-  {
-    Browser.msgBox(error)
-  }
-}
+//   try
+//   {
+//     if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
+//       managePriceChange(e, sheetName, spreadsheet)
+//     else (sheetName.split(" ").pop() === 'ORDERS')
+//       moveRow(e, sheet, spreadsheet)
+//   }
+//   catch (error)
+//   {
+//     Browser.msgBox(error)
+//   }
+// }
 
 /**
  * This function checks to see if a user is moving a row from one sheet to another.
@@ -862,11 +862,16 @@ function managePriceChange(e, sheetName, spreadsheet)
   {
     if (col === 8 || col === 9) // Cost is changing
     {
+      const isLeadPricingSheet = sheetName !== 'Bait Cost & Pricing';
       const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
-      range.offset(0, 7 - col).setValue(formattedDate).offset(0, (sheetName !== 'Bait Cost & Pricing') ? 5 : 3).uncheck().offset(0, 9).setValue('Yes');
+      range.offset(0, 7 - col).setValue(formattedDate).offset(0, (isLeadPricingSheet) ? 8 : 3).uncheck().offset(0, (isLeadPricingSheet) ? 11 : 9).setValue('Yes');
     }
-    else if (range.isChecked() && ((sheetName === 'Bait Cost & Pricing' && col === 10) || (sheetName === 'Lead Cost & Pricing' && col === 12)))
-      range.offset(0, 9).setValue('');
+    else if (range.isChecked())
+      if (sheetName === 'Bait Cost & Pricing')
+        if (col === 10)
+          range.offset(0, 9).setValue('');
+      else if (sheetName === 'Lead Cost & Pricing' && col === 15)
+        range.offset(0, 11).setValue('');
   }
 }
 
@@ -1507,9 +1512,11 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const baitSheet = spreadsheet.getSheetByName('Bait Cost & Pricing');
   const numLeadItems = leadSheet.getLastRow() - 2;
   const numBaitItems = baitSheet.getLastRow() - 2;
-  const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, leadSheet.getMaxColumns());
-  const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, baitSheet.getMaxColumns());
-  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
+  const lastColumn_LeadSheet = leadSheet.getMaxColumns();
+  const lastColumn_BaitSheet = baitSheet.getMaxColumns();
+  const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, lastColumn_LeadSheet);
+  const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, lastColumn_BaitSheet);
+  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
   const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages');
@@ -1517,22 +1524,29 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const header = costData.shift();
   const itemNumber_InventoryCsv = header.indexOf('Item #')
   const cost = header.indexOf('Cost')
-  var itemValues, discountValues, googleDescription, category, vendor, row;
+  var itemValues, discountValues, googleDescription, category, vendor;
 
-  const leadItems = leadSheetRange.getValues().map((item, rowIdx) => {
+  const leadItems = leadSheetRange.getValues().map(item => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
     discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
+    item[ 9] = '';
+    item[10] = '';
+    item[11] = '';
+    item[12] = '';
 
     if (discountValues)
     {
-      item[13] = Number(discountValues[1]);                                                    // Base Price
-      item[14] = Number(discountValues[2])/100;                                                // Guide Percent
-      item[15] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
-      item[16] = Number(discountValues[3])/100;                                                // Lodge Percent
-      item[17] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
-      item[18] = Number(discountValues[4])/100;                                                // Wholesale Percent
-      item[19] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
+      item[16] = Number(discountValues[1]);                                                    // Base Price
+      item[17] = Number(discountValues[2])/100;                                                // Guide Percent
+      item[18] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
+      item[19] = Number(discountValues[3])/100;                                                // Lodge Percent
+      item[20] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
+      item[21] = Number(discountValues[4])/100;                                                // Wholesale Percent
+      item[22] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
     }
+
+    item[23] = .23;                                          // Early Booking Percent
+    item[24] = (Number(item[16])*(1 - item[23])).toFixed(2); // Early Booking Price
 
     if (itemValues)
     {
@@ -1554,15 +1568,14 @@ function updatePriceAndCostOfLeadAndFrozenBait()
         leadSheet.showColumns(5, 2);
       }
 
-      row = rowIdx + 3;
-      item[ 9] = '=MAX(H' + row + ':I' + row + ')';        // New Cost
-      item[10] = itemValues[cost];                         // Adagio Cost
-      item[12] = Number(item[13])/Number(itemValues[cost]) // Markup %
+      item[13] = itemValues[cost];                         // Adagio Cost
+      item[15] = Number(item[16])/Number(itemValues[cost]) // Markup %
     }
 
     return item
   })
 
+  leadSheet.hideColumn(lastColumn_LeadSheet);
   leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats_leadSheet)).setValues(leadItems)
     .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
 
@@ -1608,6 +1621,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
     return item
   })
 
+  baitSheet.hideColumn(lastColumn_BaitSheet)
   baitSheetRange.setNumberFormats(new Array(numBaitItems).fill(formats_baitSheet)).setValues(baitItems)
     .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
 }
