@@ -49,29 +49,29 @@ function onChange(e)
   }
 }
 
-// /**
-//  * This function checks to see if a user is moving a row from one sheet to another.
-//  * 
-//  * @param {Event Object} e : The event object.
-//  */
-// function onEdit(e)
-// {
-//   const spreadsheet = e.source;
-//   const sheet = spreadsheet.getActiveSheet();
-//   const sheetName = sheet.getSheetName();
+/**
+ * This function checks to see if a user is moving a row from one sheet to another.
+ * 
+ * @param {Event Object} e : The event object.
+ */
+function onEdit(e)
+{
+  const spreadsheet = e.source;
+  const sheet = spreadsheet.getActiveSheet();
+  const sheetName = sheet.getSheetName();
 
-//   try
-//   {
-//     if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
-//       managePriceChange(e, sheetName, spreadsheet)
-//     else (sheetName.split(" ").pop() === 'ORDERS')
-//       moveRow(e, sheet, spreadsheet)
-//   }
-//   catch (error)
-//   {
-//     Browser.msgBox(error)
-//   }
-// }
+  try
+  {
+    if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
+      managePriceChange(e, sheetName, spreadsheet)
+    else (sheetName.split(" ").pop() === 'ORDERS')
+      moveRow(e, sheet, spreadsheet)
+  }
+  catch (error)
+  {
+    Browser.msgBox(error)
+  }
+}
 
 /**
  * This function checks to see if a user is moving a row from one sheet to another.
@@ -867,11 +867,16 @@ function managePriceChange(e, sheetName, spreadsheet)
       range.offset(0, 7 - col).setValue(formattedDate).offset(0, (isLeadPricingSheet) ? 8 : 3).uncheck().offset(0, (isLeadPricingSheet) ? 11 : 9).setValue('Yes');
     }
     else if (range.isChecked())
+    {
       if (sheetName === 'Bait Cost & Pricing')
+      {
         if (col === 10)
           range.offset(0, 9).setValue('');
+      }
       else if (sheetName === 'Lead Cost & Pricing' && col === 15)
         range.offset(0, 11).setValue('');
+        
+    }
   }
 }
 
@@ -1528,7 +1533,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
 
   const leadItems = leadSheetRange.getValues().map(item => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
-    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
+    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0].toString().toUpperCase())
     item[ 9] = '';
     item[10] = '';
     item[11] = '';
@@ -1575,13 +1580,13 @@ function updatePriceAndCostOfLeadAndFrozenBait()
     return item
   })
 
-  leadSheet.hideColumn(lastColumn_LeadSheet);
+  leadSheet.hideColumns(lastColumn_LeadSheet);
   leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats_leadSheet)).setValues(leadItems)
     .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
 
   const baitItems = baitSheetRange.getValues().map(item => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
-    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0])
+    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0].toString().toUpperCase())
 
     if (discountValues)
     {
@@ -1621,7 +1626,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
     return item
   })
 
-  baitSheet.hideColumn(lastColumn_BaitSheet)
+  baitSheet.hideColumns(lastColumn_BaitSheet)
   baitSheetRange.setNumberFormats(new Array(numBaitItems).fill(formats_baitSheet)).setValues(baitItems)
     .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
 }
