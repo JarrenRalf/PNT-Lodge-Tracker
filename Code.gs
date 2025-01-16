@@ -864,7 +864,16 @@ function managePriceChange(e, sheetName, spreadsheet)
     {
       const isLeadPricingSheet = sheetName !== 'Bait Cost & Pricing';
       const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
-      range.offset(0, 7 - col).setValue(formattedDate).offset(0, (isLeadPricingSheet) ? 8 : 3).uncheck().offset(0, (isLeadPricingSheet) ? 11 : 9).setValue('Yes');
+
+      if (isLeadPricingSheet)
+      {
+        if (range.offset(0, 14 - col).getValue() != (Number(e.value) + Number(range.offset(0, 10 - col).getValue())).toFixed(2)) // If new cost is different that previous cost, display new cost and trigger the update reminder email to send
+          range.offset(0, 7 - col).setValue(formattedDate).offset(0, 8).uncheck().offset(0, 11).setValue('Yes');
+        else
+          range.offset(0, 7 - col).setValue(formattedDate);
+      }
+      else
+        range.offset(0, 7 - col).setValue(formattedDate).offset(0, 3).uncheck().offset(0, 9).setValue('Yes');
     }
     else if (range.isChecked())
     {
@@ -875,7 +884,6 @@ function managePriceChange(e, sheetName, spreadsheet)
       }
       else if (sheetName === 'Lead Cost & Pricing' && col === 15)
         range.offset(0, 11).setValue('');
-        
     }
   }
 }
