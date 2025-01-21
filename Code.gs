@@ -13,37 +13,39 @@ function onChange(e)
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
-      
-      nRows = sheets[sheet].getLastRow();
-      nCols = sheets[sheet].getLastColumn();
-
-      info = [
-        nRows,
-        nCols,
-        sheets[sheet].getMaxRows(),
-        sheets[sheet].getMaxColumns(),
-        (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')      : false, // There is a sheet with no rows and no columns
-        (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered') : false
-      ]
-
-      // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
-      if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
-          ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && (info[isAdagioOE] || info[isBackOrderItems]))) 
+      if (sheets[sheet].getType() == SpreadsheetApp.SheetType.GRID) // Ignore the chart
       {
-        spreadsheet.toast('Processing imported data...', '', 60)
-        
-        const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols]); // This is the shopify order data
-        const fileName = sheets[sheet].getSheetName();
+        nRows = sheets[sheet].getLastRow();
+        nCols = sheets[sheet].getLastColumn();
 
-        if (fileName.substring(0, 7) !== "Copy Of") // Don't delete the sheets that are duplicates
-          spreadsheet.deleteSheet(sheets[sheet]) // Delete the new sheet that was created
+        info = [
+          nRows,
+          nCols,
+          sheets[sheet].getMaxRows(),
+          sheets[sheet].getMaxColumns(),
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')      : false, // There is a sheet with no rows and no columns
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered') : false
+        ]
 
-        if (info[isAdagioOE])
-          updateOrdersOnTracker(values, spreadsheet);
-        else if (info[isBackOrderItems])
-          updateItemsOnTracker(values, spreadsheet, fileName);
+        // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
+        if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
+            ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && (info[isAdagioOE] || info[isBackOrderItems]))) 
+        {
+          spreadsheet.toast('Processing imported data...', '', 60)
+          
+          const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols]); // This is the shopify order data
+          const fileName = sheets[sheet].getSheetName();
 
-        break;
+          if (fileName.substring(0, 7) !== "Copy Of") // Don't delete the sheets that are duplicates
+            spreadsheet.deleteSheet(sheets[sheet]) // Delete the new sheet that was created
+
+          if (info[isAdagioOE])
+            updateOrdersOnTracker(values, spreadsheet);
+          else if (info[isBackOrderItems])
+            updateItemsOnTracker(values, spreadsheet, fileName);
+
+          break;
+        }
       }
     }
   }
@@ -97,7 +99,7 @@ function onOpen(e)
 function installedOnOpen(e)
 {
   const today = new Date();
-  const year = (today.getFullYear() + 1).toString();
+  const year = (today.getMonth() > 7) ? (today.getFullYear() + 1).toString() : today.getFullYear().toString();
   const spreadsheet = e.source;
   const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
   const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
@@ -114,6 +116,8 @@ function installedOnOpen(e)
     if (today.getMonth() > 7) SpreadsheetApp.getUi().createMenu('Create ' + year + ' Lodge Tracker').addItem('Create ' + year + ' Lodge Tracker', 'createNewLodgeTracker').addToUi();
   else if (!areTriggersCreated)
     SpreadsheetApp.getUi().createMenu('Create Triggers').addItem('Create Triggers', 'triggers_CreateAll').addToUi();
+  // else
+  //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
   setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
 }
@@ -259,7 +263,7 @@ function addItemsToTransferSheet()
       if (fromLocation != undefined && toLocation != undefined && (sheetName == 'B/O' || sheetName == 'I/O'))
       {
         activeSheet.getFilter().remove(); // Remove the filter
-        activeSheet.getRange(2, 1, 1, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
+        activeSheet.getRange(2, 1, activeSheet.getLastRow() - 2, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
         SpreadsheetApp.flush();
 
         const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
@@ -574,6 +578,8 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
 {
   const boSheet = spreadsheet.getSheetByName('B/O');
   const ioSheet = spreadsheet.getSheetByName('I/O');
+  const boSheet_NumRows = boSheet.getLastRow() - 2;
+  const ioSheet_NumRows = ioSheet.getLastRow() - 2;
   boSheet.getFilter().remove(); // Remove the filter
   ioSheet.getFilter().remove();
 
@@ -585,7 +591,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
 
       if (!isBlank(ordNum[2]))
       {
-        orderNumbers = boSheet.getSheetValues(3, 11, boSheet.getLastRow() - 2, 1);
+        orderNumbers = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
         row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
 
         if (row !== -1)
@@ -596,7 +602,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
         }
 
         // Inital Orders Sheet
-        orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1);
+        orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
         row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
 
         if (row !== -1)
@@ -612,8 +618,8 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
   {
     if (!isBlank(orderNumber)) // Order number is not blank on the Orders page
     {
-      const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet.getLastRow() - 2, 1);
-      const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1);
+      const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
+      const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
       const row_BO = orderNumbers_BO.findIndex(ordNum => ordNum[0] == orderNumber);
       const row_IO = orderNumbers_IO.findIndex(ordNum => ordNum[0] == orderNumber);
 
@@ -631,8 +637,8 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
     }
   }  
 
-  boSheet.getRange(2, 1, 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
-  ioSheet.getRange(2, 1, 1, ioSheet.getLastColumn()).createFilter();
+  boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter();
 }
 
 /**
@@ -659,14 +665,50 @@ function emailCostChangeOfLeadOrFrozenBait()
   const url = spreadsheet.getUrl();
   const leadSheet = spreadsheet.getSheetByName('Lead Cost & Pricing');
   const baitSheet = spreadsheet.getSheetByName('Bait Cost & Pricing');
-  const hasLeadCostsChanged = leadSheet.getSheetValues(3, leadSheet.getMaxColumns(), leadSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes')
-  const hasBaitCostsChanged = baitSheet.getSheetValues(3, baitSheet.getMaxColumns(), baitSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes');
+  const hasLeadCostsChanged_OnThisSS = leadSheet.getSheetValues(3, leadSheet.getMaxColumns(), leadSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes');
+  const hasBaitCostsChanged_OnThisSS = baitSheet.getSheetValues(3, baitSheet.getMaxColumns(), baitSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes');
+  const hasLeadCostsChanged_InAdagio = leadSheet.getSheetValues(3, 14, leadSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0]));
+  const hasBaitCostsChanged_InAdagio = baitSheet.getSheetValues(3, 14, baitSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0])); 
 
-  if (hasLeadCostsChanged)
+  if (hasLeadCostsChanged_OnThisSS || hasLeadCostsChanged_InAdagio)
     sendEmail(url + '?gid=' + leadSheet.getSheetId(), "Lead Cost & Pricing")
 
-  if (hasBaitCostsChanged)
+  if (hasBaitCostsChanged_OnThisSS || hasBaitCostsChanged_InAdagio)
     sendEmail(url + '?gid=' + baitSheet.getSheetId(), "Bait Cost & Pricing")
+}
+
+/**
+ * This function gets the chart data
+ * 
+ * @author Jarren Ralf
+ */
+function getChartData()
+{
+  const spreadsheet = SpreadsheetApp.getActive()
+  const allDataSheet = spreadsheet.getSheetByName('All Data')
+  const chartDataSheet = spreadsheet.getSheetByName('Copy of Chart Data')
+  const numRows = allDataSheet.getLastRow() - 1;
+  const allData = allDataSheet.getSheetValues(2, 1, numRows, 2);
+  const chartData = new Array(53).fill(new Array(8).fill(0))
+  Logger.log(chartData)
+  const firstDayOfYear = {
+    2018: new Date(2018, 0, 1).getTime(),
+    2019: new Date(2019, 0, 1).getTime(),
+    2020: new Date(2020, 0, 1).getTime(),
+    2021: new Date(2021, 0, 1).getTime(),
+    2022: new Date(2022, 0, 1).getTime(),
+    2023: new Date(2023, 0, 1).getTime(),
+    2024: new Date(2024, 0, 1).getTime(),
+    2025: new Date(2025, 0, 1).getTime()
+  }
+  var year;
+
+  for (var i = numRows - 1; i >= 0; i--)
+  {
+    year = allData[i][0].getFullYear();
+    chartData[Math.floor((allData[i][0] - firstDayOfYear[year])/604800000)][2025 - year] += allData[i][1]
+  }
+  Logger.log(chartData)
 }
 
 /**
@@ -867,8 +909,8 @@ function managePriceChange(e, sheetName, spreadsheet)
 
       if (isLeadPricingSheet)
       {
-        if (range.offset(0, 14 - col).getValue() != (Number(e.value) + Number(range.offset(0, 10 - col).getValue())).toFixed(2)) // If new cost is different that previous cost, display new cost and trigger the update reminder email to send
-          range.offset(0, 7 - col).setValue(formattedDate).offset(0, 8).uncheck().offset(0, 11).setValue('Yes');
+        if (range.offset(0, 15 - col).getValue() != (Number(e.value) + Number(range.offset(0, 10 - col).getValue())).toFixed(2)) // If new cost is different that previous cost, display new cost and trigger the update reminder email to send
+          range.offset(0, 7 - col).setValue(formattedDate).offset(0, 9).uncheck().offset(0, 11).setValue('Yes');
         else
           range.offset(0, 7 - col).setValue(formattedDate);
       }
@@ -882,7 +924,7 @@ function managePriceChange(e, sheetName, spreadsheet)
         if (col === 10)
           range.offset(0, 9).setValue('');
       }
-      else if (sheetName === 'Lead Cost & Pricing' && col === 15)
+      else if (sheetName === 'Lead Cost & Pricing' && col === 16)
         range.offset(0, 11).setValue('');
     }
   }
@@ -1004,7 +1046,7 @@ function removeDashesFromSku(sku)
 }
 
 /**
- * This funtion sends an email to me every morning that there are database problems that I should be able to address quickly.
+ * This funtion sends an email to me whenever there are costs in Access that need to be updated.
  * 
  * @author Jarren
  */
@@ -1016,6 +1058,32 @@ function sendEmail(url, sheetName)
     htmlBody: '<a href="' + url + '">' + sheetName + ' has changed.</a>'
   });
 }
+
+// /**
+//  * This funtion sends an email to me every morning that there are database problems that I should be able to address quickly.
+//  * 
+//  * @author Jarren
+//  */
+// function sendEmails_CheckApprovalOfSelectedOrders()
+// {
+//   const spreadsheet = SpreadsheetApp.getActive();
+//   const sheet = spreadsheet.getActiveSheet()
+//   const activeSheet = sheet.getSheetName();
+
+//   if (activeSheet === 'LODGE ORDERS')
+//   {
+//     const activeRanges = sheet.getActiveRangeList().getRanges().map((rng, r) => {
+      
+//     })
+
+//   }
+//   else if (activeSheet === 'GUIDE ORDERS')
+//   {
+
+//   }
+//   else
+//     Browser.msgBox('You can only run this function from the LODGE ORDERS or GUIDE ORDERS sheet.')
+// }
 
 /**
  * This function sets the column widths of 4 of the sheets on this spreadsheet, namely the Order and Completed pages.
@@ -1062,10 +1130,14 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
   const orderNumbersRange = sheet.getRange(3, 3, sheet.getLastRow() - 2, 1)
   const boSheet = spreadsheet.getSheetByName('B/O')
   const ioSheet = spreadsheet.getSheetByName('I/O')
+  boSheet.getFilter().remove(); // Remove the filter
+  ioSheet.getFilter().remove(); // Remove the filter
   const boSheetId = boSheet.getSheetId()
   const ioSheetId = ioSheet.getSheetId()
-  const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet.getLastRow() - 2, 1);
-  const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet.getLastRow() - 2, 1);
+  const boSheet_LastRow = boSheet.getLastRow()
+  const ioSheet_LastRow = ioSheet.getLastRow()
+  const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1);
+  const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1);
   const orderNumbers = orderNumbersRange.getRichTextValues().map(ordNum => {
     orderNumber = ordNum[0].getText();
     row_io = orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3;
@@ -1084,6 +1156,8 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
   })
 
   orderNumbersRange.setRichTextValues(orderNumbers)
+  boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter(); // Create a filter in the header
 }
 
 /**
@@ -1232,7 +1306,8 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   else
     spreadsheet.toast('ORD# ' + orderNumber + ' may be in the process of being shipped.', '**NO B/O or I/O Items Imported**', 60)
 
-  itemSheet.getRange(2, 1, 1, itemSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  SpreadsheetApp.flush()
+  itemSheet.getRange(2, 1, itemSheet.getLastRow() - 1, itemSheet.getLastColumn()).createFilter(); // Create a filter in the header
 }
 
 /**
@@ -1529,7 +1604,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const lastColumn_BaitSheet = baitSheet.getMaxColumns();
   const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, lastColumn_LeadSheet);
   const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, lastColumn_BaitSheet);
-  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
+  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
   const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages');
@@ -1542,24 +1617,25 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const leadItems = leadSheetRange.getValues().map(item => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
     discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0].toString().toUpperCase())
-    item[ 9] = '';
+    item[ 9] = ''; // Clear the cost fields that are calculated by formulas
     item[10] = '';
     item[11] = '';
     item[12] = '';
+    item[13] = '';
 
     if (discountValues)
     {
-      item[16] = Number(discountValues[1]);                                                    // Base Price
-      item[17] = Number(discountValues[2])/100;                                                // Guide Percent
-      item[18] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
-      item[19] = Number(discountValues[3])/100;                                                // Lodge Percent
-      item[20] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
-      item[21] = Number(discountValues[4])/100;                                                // Wholesale Percent
-      item[22] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
+      item[17] = Number(discountValues[1]);                                                    // Base Price
+      item[18] = Number(discountValues[2])/100;                                                // Guide Percent
+      item[19] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
+      item[20] = Number(discountValues[3])/100;                                                // Lodge Percent
+      item[21] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
+      item[22] = Number(discountValues[4])/100;                                                // Wholesale Percent
+      item[23] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
     }
 
-    item[23] = .23;                                          // Early Booking Percent
-    item[24] = (Number(item[16])*(1 - item[23])).toFixed(2); // Early Booking Price
+    item[24] = .23;                                          // Early Booking Percent
+    item[25] = (Number(item[17])*(1 - item[24])).toFixed(2); // Early Booking Price
 
     if (itemValues)
     {
@@ -1581,8 +1657,8 @@ function updatePriceAndCostOfLeadAndFrozenBait()
         leadSheet.showColumns(5, 2);
       }
 
-      item[13] = itemValues[cost];                         // Adagio Cost
-      item[15] = Number(item[16])/Number(itemValues[cost]) // Markup %
+      item[14] = itemValues[cost];                         // Adagio Cost
+      item[16] = Number(item[17])/Number(itemValues[cost]) // Markup %
     }
 
     return item
@@ -1592,7 +1668,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats_leadSheet)).setValues(leadItems)
     .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
 
-  const baitItems = baitSheetRange.getValues().map(item => {
+  const baitItems = baitSheetRange.getValues().map((item, i) => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
     discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0].toString().toUpperCase())
 
