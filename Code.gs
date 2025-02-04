@@ -721,6 +721,8 @@ function getChartData()
  */
 function getDateString(date, months)
 {
+  Logger.log(date)
+  
   const d_split = date.toString().split('-');
   
   return months[d_split[0]] + ' ' + d_split[1] + ', ' + d_split[2];
@@ -751,33 +753,38 @@ function getEnteredByNameAndApprovalStatus(orderNumber, orders)
  */
 function getFullName(initials)
 {
-  switch (initials.trim())
+  if (initials != null)
   {
-    case '':
-      return '';
-    case 'AJ':
-      return 'Adrian';
-    case 'BK':
-      return 'Brent';
-    case 'EG':
-      return 'Eryn';
-    case 'FN':
-      return 'Frank';
-    case 'GN':
-      return 'Gary';
-    case 'KN':
-      return 'Kris';
-    case 'KT':
-      return 'Karen';
-    case 'MW':
-      return 'Mark';
-    case 'SN':
-      return 'Scott';
-    case 'TW':
-      return 'Jarren';
-    default:
-      return initials;
+    switch (initials.trim())
+    {
+      case '':
+        return '';
+      case 'AJ':
+        return 'Adrian';
+      case 'BK':
+        return 'Brent';
+      case 'EG':
+        return 'Eryn';
+      case 'FN':
+        return 'Frank';
+      case 'GN':
+        return 'Gary';
+      case 'KN':
+        return 'Kris';
+      case 'KT':
+        return 'Karen';
+      case 'MW':
+        return 'Mark';
+      case 'SN':
+        return 'Scott';
+      case 'TW':
+        return 'Jarren';
+      default:
+        return initials;
+    }
   }
+  
+  return '';
 }
 
 /**
@@ -1380,7 +1387,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   const newLodgeOrders = 
     (isCompletedOrders) ? // If true, then the import is a set of invoiced and completed orders
-      ((creditNumIdx) ? 
+      ((creditNumIdx !== -1) ? 
         allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
           ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
             (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
@@ -1399,7 +1406,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
         (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
         || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
-      && order[isOrderCompleteIdx] === 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
+      && order[isOrderCompleteIdx] === 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => { 
       return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', '', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Lodge Orders
   });
 
