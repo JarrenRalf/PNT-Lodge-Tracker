@@ -909,15 +909,15 @@ function managePriceChange(e, sheetName, spreadsheet)
 
   if (row == range.rowEnd && col == range.columnEnd && row > 2) // Only look at a single cell edit
   {
-    if (col === 8 || col === 9) // Cost is changing
+    if (col === 8 || col === 9 || col === 10) // Cost is changing
     {
       const isLeadPricingSheet = sheetName !== 'Bait Cost & Pricing';
       const formattedDate = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(),"dd MMM yyyy")
 
       if (isLeadPricingSheet)
       {
-        if (range.offset(0, 15 - col).getValue() != (Number(e.value) + Number(range.offset(0, 10 - col).getValue())).toFixed(2)) // If new cost is different that previous cost, display new cost and trigger the update reminder email to send
-          range.offset(0, 7 - col).setValue(formattedDate).offset(0, 9).uncheck().offset(0, 11).setValue('Yes');
+        if (range.offset(0, 16 - col).getValue() != (Number(e.value) + Number(range.offset(0, 11 - col).getValue())).toFixed(2)) // If new cost is different that previous cost, display new cost and trigger the update reminder email to send
+          range.offset(0, 7 - col).setValue(formattedDate).offset(0, 10).uncheck().offset(0, 11).setValue('Yes');
         else
           range.offset(0, 7 - col).setValue(formattedDate);
       }
@@ -931,7 +931,7 @@ function managePriceChange(e, sheetName, spreadsheet)
         if (col === 10)
           range.offset(0, 9).setValue('');
       }
-      else if (sheetName === 'Lead Cost & Pricing' && col === 16)
+      else if (sheetName === 'Lead Cost & Pricing' && col === 17)
         range.offset(0, 11).setValue('');
     }
   }
@@ -1060,7 +1060,7 @@ function removeDashesFromSku(sku)
 function sendEmail(url, sheetName)
 {
   MailApp.sendEmail({
-    to: "lb_blitz_allstar@hotmail.com",
+    to: "jarren@pacificnetandtwine.com",
     subject: "Some Costs in Access Need Updating",
     htmlBody: '<a href="' + url + '">' + sheetName + ' has changed.</a>'
   });
@@ -1611,7 +1611,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const lastColumn_BaitSheet = baitSheet.getMaxColumns();
   const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, lastColumn_LeadSheet);
   const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, lastColumn_BaitSheet);
-  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
+  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
   const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages');
@@ -1624,25 +1624,25 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const leadItems = leadSheetRange.getValues().map(item => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() === item[0])
     discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase() === item[0].toString().toUpperCase())
-    item[ 9] = ''; // Clear the cost fields that are calculated by formulas
-    item[10] = '';
-    item[11] = '';
-    item[12] = '';
-    item[13] = '';
+    item[10] = ''; // Freight per pc ***Clear the cost and price fields that are calculated by formulas
+    item[11] = ''; // Freight to PR
+    item[12] = ''; // Alberni + Freight
+    item[13] = ''; // Jason + Freight
+    item[14] = ''; // NEW
+    item[20] = ''; // Guide Price
+    item[22] = ''; // Lodge Price
+    item[24] = ''; // Wholesale Price
+    item[26] = ''; // Early Booking Price
+
+    item[25] = .23; // Early Booking Percent
 
     if (discountValues)
     {
-      item[17] = Number(discountValues[1]);                                                    // Base Price
-      item[18] = Number(discountValues[2])/100;                                                // Guide Percent
-      item[19] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
-      item[20] = Number(discountValues[3])/100;                                                // Lodge Percent
-      item[21] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
-      item[22] = Number(discountValues[4])/100;                                                // Wholesale Percent
-      item[23] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
+      item[18] = Number(discountValues[1]);     // Base Price
+      item[19] = Number(discountValues[2])/100; // Guide Percent
+      item[21] = Number(discountValues[3])/100; // Lodge Percent
+      item[23] = Number(discountValues[4])/100; // Wholesale Percent
     }
-
-    item[24] = .23;                                          // Early Booking Percent
-    item[25] = (Number(item[17])*(1 - item[24])).toFixed(2); // Early Booking Price
 
     if (itemValues)
     {
@@ -1664,8 +1664,8 @@ function updatePriceAndCostOfLeadAndFrozenBait()
         leadSheet.showColumns(5, 2);
       }
 
-      item[14] = itemValues[cost];                         // Adagio Cost
-      item[16] = Number(item[17])/Number(itemValues[cost]) // Markup %
+      item[15] = itemValues[cost];                         // Adagio Cost
+      item[17] = Number(item[18])/Number(itemValues[cost]) // Markup %
     }
 
     return item
