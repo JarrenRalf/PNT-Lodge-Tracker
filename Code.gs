@@ -661,6 +661,7 @@ function doesOrderContainBOs(order, backOrderNumbers)
  */
 function emailCostChangeOfLeadOrFrozenBait()
 {
+  const SATURDAY = 6;
   const spreadsheet = SpreadsheetApp.getActive();
   const url = spreadsheet.getUrl();
   const leadSheet = spreadsheet.getSheetByName('Lead Cost & Pricing');
@@ -670,11 +671,14 @@ function emailCostChangeOfLeadOrFrozenBait()
   const hasLeadCostsChanged_InAdagio = leadSheet.getSheetValues(3, 14, leadSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0]));
   const hasBaitCostsChanged_InAdagio = baitSheet.getSheetValues(3, 14, baitSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0])); 
 
-  if (hasLeadCostsChanged_OnThisSS || hasLeadCostsChanged_InAdagio)
-    sendEmail(url + '?gid=' + leadSheet.getSheetId(), "Lead Cost & Pricing")
+  if (new Date().getDay() !== SATURDAY) // Don't send the emails on Saturday (Sunday is fine because I can address them Monday morning)
+  {
+    if (hasLeadCostsChanged_OnThisSS || hasLeadCostsChanged_InAdagio)
+      sendEmail(url + '?gid=' + leadSheet.getSheetId(), "Lead Cost & Pricing")
 
-  if (hasBaitCostsChanged_OnThisSS || hasBaitCostsChanged_InAdagio)
-    sendEmail(url + '?gid=' + baitSheet.getSheetId(), "Bait Cost & Pricing")
+    if (hasBaitCostsChanged_OnThisSS || hasBaitCostsChanged_InAdagio)
+      sendEmail(url + '?gid=' + baitSheet.getSheetId(), "Bait Cost & Pricing")
+  }
 }
 
 /**
@@ -720,9 +724,7 @@ function getChartData()
  * @author Jarren Ralf
  */
 function getDateString(date, months)
-{
-  Logger.log(date)
-  
+{  
   const d_split = date.toString().split('-');
   
   return months[d_split[0]] + ' ' + d_split[1] + ', ' + d_split[2];
