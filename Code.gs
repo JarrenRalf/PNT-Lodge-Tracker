@@ -1135,6 +1135,7 @@ function setColumnWidths()
  */
 function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
 {
+  spreadsheet.toast('Order # hyperlinks being established...', '', -1)
   var orderNumber, row_bo, row_io;
   const orderNumbersRange = sheet.getRange(3, 3, sheet.getLastRow() - 2, 1)
   const boSheet = spreadsheet.getSheetByName('B/O')
@@ -1167,6 +1168,7 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
   orderNumbersRange.setRichTextValues(orderNumbers)
   boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
   ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  spreadsheet.toast('Order # hyperlinks completed.', '')
 }
 
 /**
