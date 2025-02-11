@@ -668,15 +668,18 @@ function emailCostChangeOfLeadOrFrozenBait()
   const baitSheet = spreadsheet.getSheetByName('Bait Cost & Pricing');
   const hasLeadCostsChanged_OnThisSS = leadSheet.getSheetValues(3, leadSheet.getMaxColumns(), leadSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes');
   const hasBaitCostsChanged_OnThisSS = baitSheet.getSheetValues(3, baitSheet.getMaxColumns(), baitSheet.getLastRow() - 2, 1).some(recentChanges => recentChanges[0] === 'Yes');
-  const hasLeadCostsChanged_InAdagio = leadSheet.getSheetValues(3, 14, leadSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0]));
-  const hasBaitCostsChanged_InAdagio = baitSheet.getSheetValues(3, 14, baitSheet.getLastRow() - 2, 1).some(recentChanges => isBlank(recentChanges[0])); 
+  const hasLeadCostsChanged_InAdagio = leadSheet.getSheetValues(3, 15, leadSheet.getLastRow() - 2, 1).some(recentChanges => !isBlank(recentChanges[0]));
 
   if (new Date().getDay() !== SATURDAY) // Don't send the emails on Saturday (Sunday is fine because I can address them Monday morning)
   {
     if (hasLeadCostsChanged_OnThisSS || hasLeadCostsChanged_InAdagio)
+    {
+      Logger.log('hasLeadCostsChanged_OnThisSS: ' + hasLeadCostsChanged_OnThisSS)
+      Logger.log('hasLeadCostsChanged_InAdagio: ' + hasLeadCostsChanged_InAdagio)
       sendEmail(url + '?gid=' + leadSheet.getSheetId(), "Lead Cost & Pricing")
+    }
 
-    if (hasBaitCostsChanged_OnThisSS || hasBaitCostsChanged_InAdagio)
+    if (hasBaitCostsChanged_OnThisSS)
       sendEmail(url + '?gid=' + baitSheet.getSheetId(), "Bait Cost & Pricing")
   }
 }
@@ -1618,7 +1621,8 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
-  const discountSheet = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs').getSheetByName('Discount Percentages');
+  const discountSS = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs');
+  const discountSheet = discountSS.getSheetByName('Discount Percentages');
   const discounts = discountSheet.getSheetValues(2, 11, discountSheet.getLastRow() - 1, 5)
   const header = costData.shift();
   const itemNumber_InventoryCsv = header.indexOf('Item #')
@@ -1723,5 +1727,5 @@ function updatePriceAndCostOfLeadAndFrozenBait()
 
   baitSheet.hideColumns(lastColumn_BaitSheet)
   baitSheetRange.setNumberFormats(new Array(numBaitItems).fill(formats_baitSheet)).setValues(baitItems)
-    .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']')
+    .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']\n[Prices Updated At: ' + discountSS.getSheetValues(2, 2, 1, 1)[0][0].split(' at ')[1] + ']')
 }
