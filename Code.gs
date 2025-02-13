@@ -9,7 +9,7 @@ function onChange(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isBackOrderItems = 5, nRows = 0, nCols = 0;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isBackOrderItems = 5, isPurchaseOrderItems = 6, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -23,13 +23,14 @@ function onChange(e)
           nCols,
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')      : false, // There is a sheet with no rows and no columns
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered') : false
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')        : false, // There is a sheet with no rows and no columns
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered')   : false, 
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false
         ]
 
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
         if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
-            ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && (info[isAdagioOE] || info[isBackOrderItems]))) 
+            ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && (info[isAdagioOE] || info[isBackOrderItems] || info[isPurchaseOrderItems]))) 
         {
           spreadsheet.toast('Processing imported data...', '', 60)
           
@@ -43,6 +44,8 @@ function onChange(e)
             updateOrdersOnTracker(values, spreadsheet);
           else if (info[isBackOrderItems])
             updateItemsOnTracker(values, spreadsheet, fileName);
+          else if (info[isPurchaseOrderItems])
+            updatePoItemsOnTracker(values, spreadsheet);
 
           break;
         }
@@ -1599,6 +1602,83 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   }
 
   spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+}
+
+/**
+ * This function handles the import of a purchase order that contains items that the lodge has ordered.
+ * 
+ * @param {String[][]}     items    : A list of items on the purchase order that was imported.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf
+ */
+function updatePoItemsOnTracker(items, spreadsheet)
+{
+  items.pop(); // Remove the "Total" or final line
+
+  // Get all the indexes of the relevant headers
+  const headerOE = items.shift();
+  const dateIdx = headerOE.indexOf('Rate Date');
+  const vendorNameIdx = headerOE.indexOf('Vendor name');
+  const originalOrderedQtyIdx = headerOE.indexOf('Qty Originally Ordered');
+  const backOrderQtyIdx = headerOE.indexOf('Backordered'); 
+  const skuIdx = headerOE.indexOf('Item#');
+  const descriptionIdx = headerOE.indexOf('Description');
+  const unitCostIdx = headerOE.indexOf('Unit Cost');
+  const extendedUnitCostIdx = headerOE.indexOf('Extended Order Cost');
+  const locationIdx = headerOE.indexOf('Location');
+  const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
+  const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
+  const orderDate = getDateString(items[0][dateIdx], months);
+  const locationName = getLocationName(items[0][locationIdx]);
+
+  const newItems = items.map(item => [orderDate, item[vendorNameIdx], item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
+    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
+  );
+
+  const poItemSheet = spreadsheet.getSheetByName('P/O').activate(); 
+  const numRows = poItemSheet.getLastRow() - 2;
+  const numNewItems = newItems.length;
+  var numItemsRemoved = numNewItems;
+  poItemSheet.getFilter().remove(); // Remove the filter
+
+  if (numRows > 0)
+  {
+    const poNum = poItemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Purchase Order #');
+    var currentItems = poItemSheet.getSheetValues(3, 1, numRows, poItemSheet.getLastColumn()).filter(item => item[poNum] !== purchaseOrderNumber);
+    var numCurrentItems = currentItems.length;
+    poItemSheet.getRange(3, 1, numCurrentItems, currentItems[0].length).setValues(currentItems);
+
+    if (numRows > numCurrentItems)
+    {
+      numItemsRemoved = numRows - numCurrentItems;
+      poItemSheet.deleteRows(numCurrentItems + 3, numItemsRemoved);
+    }
+  }
+
+  Logger.log('Purchase Order Number: ' + purchaseOrderNumber)
+
+  if (numNewItems > 0)
+  {
+    const numCols = newItems[0].length;
+
+    if (numRows > 0)
+      poItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+        .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 1, ascending: true}]);
+    else
+      poItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+        .setValues(newItems)
+
+    Logger.log('The following new Ordered items were added to the P/O tab:')
+    Logger.log(newItems)
+
+    spreadsheet.toast(numNewItems + ' Added ' + (numItemsRemoved - numNewItems) + ' Removed', 'P/O Items Imported', 60)
+  }
+  else
+    spreadsheet.toast(purchaseOrderNumber + ' may be in the process of being received.', '**NO Items Imported**', 60)
+
+  SpreadsheetApp.flush()
+  poItemSheet.getRange(2, 1, poItemSheet.getLastRow() - 1, poItemSheet.getLastColumn()).createFilter(); // Create a filter in the header
 }
 
 /**
