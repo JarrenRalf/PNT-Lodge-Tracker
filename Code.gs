@@ -1632,8 +1632,8 @@ function updatePoItemsOnTracker(items, spreadsheet)
   const locationName = getLocationName(items[0][locationIdx]);
 
   const newItems = items.map(item => [orderDate, item[vendorNameIdx], item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
-    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
-  );
+      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
+  ).filter(item => item[2] !== 0 || item[3] !== 0 || isBlank(item[4])); // Remove items that have already been received, as well as keep comments / notes
 
   const poItemSheet = spreadsheet.getSheetByName('P/O').activate(); 
   const numRows = poItemSheet.getLastRow() - 2;
