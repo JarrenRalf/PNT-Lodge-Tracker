@@ -1,4 +1,10 @@
 /**
+ * Send an automated email weekly with all of the lines from the IO / BO / PO tabs that have nothing written in the Notes column. Accompany the information with the relevant orders from the Lodge Orders page.
+ * 
+ * Also, import PO numbers to auto delete the POs that have already been received.
+ */
+
+/**
  * This function handles the import of an excel file by identifying the creation of a new sheet.
  * 
  * @param {Event Object} e : The event object.
@@ -265,7 +271,7 @@ function addItemsToTransferSheet()
 
       if (fromLocation != undefined && toLocation != undefined && (sheetName == 'B/O' || sheetName == 'I/O'))
       {
-        activeSheet.getFilter().remove(); // Remove the filter
+        activeSheet?.getFilter()?.remove(); // Remove the filter
         activeSheet.getRange(2, 1, activeSheet.getLastRow() - 2, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
         SpreadsheetApp.flush();
 
@@ -583,8 +589,8 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
   const ioSheet = spreadsheet.getSheetByName('I/O');
   const boSheet_NumRows = boSheet.getLastRow() - 2;
   const ioSheet_NumRows = ioSheet.getLastRow() - 2;
-  boSheet.getFilter().remove(); // Remove the filter
-  ioSheet.getFilter().remove();
+  boSheet?.getFilter()?.remove(); // Remove the filter
+  ioSheet?.getFilter()?.remove();
 
   if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
   {
@@ -594,25 +600,32 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
 
       if (!isBlank(ordNum[2]))
       {
-        orderNumbers = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
-        row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
-
-        if (row !== -1)
+        // Back Orders Sheet
+        if (boSheet_NumRows > 0)
         {
-          numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
-          boSheet.deleteRows(row + 3, numRows);
-          SpreadsheetApp.flush();
+          orderNumbers = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
+          row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
+
+          if (row !== -1)
+          {
+            numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
+            boSheet.deleteRows(row + 3, numRows);
+            SpreadsheetApp.flush();
+          }
         }
 
         // Inital Orders Sheet
-        orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
-        row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
-
-        if (row !== -1)
+        if (ioSheet_NumRows > 0)
         {
-          numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
-          ioSheet.deleteRows(row + 3, numRows);
-          SpreadsheetApp.flush();
+          orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
+          row = orderNumbers.findIndex(ordNum => ordNum[0] == ordNum[2]);
+
+          if (row !== -1)
+          {
+            numRows = orderNumbers.findLastIndex(ordNum => ordNum[0] == ordNum[2]) - row + 1;
+            ioSheet.deleteRows(row + 3, numRows);
+            SpreadsheetApp.flush();
+          }
         }
       }
     })
@@ -621,27 +634,37 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
   {
     if (!isBlank(orderNumber)) // Order number is not blank on the Orders page
     {
-      const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
-      const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
-      const row_BO = orderNumbers_BO.findIndex(ordNum => ordNum[0] == orderNumber);
-      const row_IO = orderNumbers_IO.findIndex(ordNum => ordNum[0] == orderNumber);
-
-      if (row_BO !== -1)
+      if (boSheet_NumRows > 0)
       {
-        const numRows_BO = orderNumbers_BO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_BO + 1;
-        boSheet.deleteRows(row_BO + 3, numRows_BO);
+        const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
+        const row_BO = orderNumbers_BO.findIndex(ordNum => ordNum[0] == orderNumber);
+
+        if (row_BO !== -1)
+        {
+          const numRows_BO = orderNumbers_BO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_BO + 1;
+          boSheet.deleteRows(row_BO + 3, numRows_BO);
+        }
       }
-
-      if (row_IO !== -1)
+      
+      if (ioSheet_NumRows > 0)
       {
-        const numRows_IO = orderNumbers_IO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_IO + 1;
-        ioSheet.deleteRows(row_IO + 3, numRows_IO);
+        const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
+        const row_IO = orderNumbers_IO.findIndex(ordNum => ordNum[0] == orderNumber);
+
+        if (row_IO !== -1)
+        {
+          const numRows_IO = orderNumbers_IO.findLastIndex(ordNum => ordNum[0] == orderNumber) - row_IO + 1;
+          ioSheet.deleteRows(row_IO + 3, numRows_IO);
+        }
       }
     }
   }  
 
-  boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
-  ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter();
+  if (boSheet_NumRows > 0)
+    boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
+
+  if (ioSheet_NumRows > 0)
+    ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter();
 }
 
 /**
@@ -1146,21 +1169,22 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
   const orderNumbersRange = sheet.getRange(3, 3, sheet.getLastRow() - 2, 1)
   const boSheet = spreadsheet.getSheetByName('B/O')
   const ioSheet = spreadsheet.getSheetByName('I/O')
-  boSheet.getFilter().remove(); // Remove the filter
-  ioSheet.getFilter().remove(); // Remove the filter
+  boSheet?.getFilter()?.remove(); // Remove the filter
+  ioSheet?.getFilter()?.remove(); // Remove the filter
   const boSheetId = boSheet.getSheetId()
   const ioSheetId = ioSheet.getSheetId()
   const boSheet_LastRow = boSheet.getLastRow()
   const ioSheet_LastRow = ioSheet.getLastRow()
-  const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1);
-  const orderNumbers_IO = ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1);
+  const orderNumbers_BO = (boSheet_LastRow > 2) ? boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1) : null;
+  const orderNumbers_IO = (ioSheet_LastRow > 2) ? ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1) : null;
+    
   const orderNumbers = orderNumbersRange.getRichTextValues().map(ordNum => {
     orderNumber = ordNum[0].getText();
-    row_io = orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3;
+    row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
 
     if (row_io > 2)
       return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
-    else
+    else if (orderNumbers_BO != null) // Make sure there are back order items on the list
     {
       row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
 
@@ -1169,6 +1193,8 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
       else
         return ordNum;
     }
+    else 
+      return ordNum;
   })
 
   orderNumbersRange.setRichTextValues(orderNumbers)
@@ -1266,11 +1292,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const numRows = itemSheet.getLastRow() - 2;
   const numNewItems = newItems.length;
   var numItemsRemoved = numNewItems;
-  itemSheet.getFilter().remove(); // Remove the filter
+  itemSheet?.getFilter()?.remove(); // Remove the filter
 
   if (numRows > 0)
-  {
-    
+  { 
     const ordNum = itemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Order #');
     var currentItems = itemSheet.getSheetValues(3, 1, numRows, itemSheet.getLastColumn()).filter(item => isBlank(item[ordNum]) || item[ordNum] !== orderNumber);
     var numCurrentItems = currentItems.length;
@@ -1639,7 +1664,7 @@ function updatePoItemsOnTracker(items, spreadsheet)
   const numRows = poItemSheet.getLastRow() - 2;
   const numNewItems = newItems.length;
   var numItemsRemoved = numNewItems;
-  poItemSheet.getFilter().remove(); // Remove the filter
+  poItemSheet?.getFilter()?.remove(); // Remove the filter
 
   if (numRows > 0)
   {
