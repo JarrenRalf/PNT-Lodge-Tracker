@@ -1162,11 +1162,10 @@ function setColumnWidths()
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @author Jarren Ralf 
  */
-function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
+function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
 {
   spreadsheet.toast('Order # hyperlinks being established...', '', -1)
   var orderNumber, row_bo, row_io;
-  const orderNumbersRange = sheet.getRange(3, 3, sheet.getLastRow() - 2, 1)
   const boSheet = spreadsheet.getSheetByName('B/O')
   const ioSheet = spreadsheet.getSheetByName('I/O')
   boSheet?.getFilter()?.remove(); // Remove the filter
@@ -1177,27 +1176,64 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(sheet, spreadsheet)
   const ioSheet_LastRow = ioSheet.getLastRow()
   const orderNumbers_BO = (boSheet_LastRow > 2) ? boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1) : null;
   const orderNumbers_IO = (ioSheet_LastRow > 2) ? ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1) : null;
-    
-  const orderNumbers = orderNumbersRange.getRichTextValues().map(ordNum => {
-    orderNumber = ordNum[0].getText();
-    row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
 
-    if (row_io > 2)
-      return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
-    else if (orderNumbers_BO != null) // Make sure there are back order items on the list
-    {
-      row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
+  const numLodgeOrders = lodgeOrdersSheet.getLastRow() - 2;
 
-      if (row_bo > 2)
-        return [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_io + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]
-      else
+  if (numLodgeOrders > 0)
+  {
+    const orderNumbersRange_Lodge = lodgeOrdersSheet.getRange(3, 3, numLodgeOrders, 1)
+
+    const orderNumbers_Lodge = orderNumbersRange_Lodge.getRichTextValues().map(ordNum => {
+      orderNumber = ordNum[0].getText();
+      row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
+
+      if (row_io > 2)
+        return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
+      else if (orderNumbers_BO != null) // Make sure there are back order items on the list
+      {
+        row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
+
+        if (row_bo > 2)
+          return [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_io + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]
+        else
+          return ordNum;
+      }
+      else 
         return ordNum;
-    }
-    else 
-      return ordNum;
-  })
+    })
 
-  orderNumbersRange.setRichTextValues(orderNumbers)
+    orderNumbersRange_Lodge.setRichTextValues(orderNumbers_Lodge);
+  }
+  
+  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
+  const numGuideOrders = guideOrdersSheet.getLastRow() - 2;
+
+  if (numGuideOrders > 0)
+  {
+    const orderNumbersRange_Guide = guideOrdersSheet.getRange(3, 3, numGuideOrders, 1)
+
+    const orderNumbers_Guide = orderNumbersRange_Guide.getRichTextValues().map(ordNum => {
+      orderNumber = ordNum[0].getText();
+      row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
+
+      if (row_io > 2)
+        return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
+      else if (orderNumbers_BO != null) // Make sure there are back order items on the list
+      {
+        row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
+
+        if (row_bo > 2)
+          return [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_io + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]
+        else
+          return ordNum;
+      }
+      else 
+        return ordNum;
+    })
+
+    orderNumbersRange_Guide.setRichTextValues(orderNumbers_Guide);
+  }
+
   boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
   ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter(); // Create a filter in the header
   spreadsheet.toast('Order # hyperlinks completed.', '')
@@ -1260,8 +1296,9 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
   const charterGuideCustomerSheet = spreadsheet.getSheetByName('Charter & Guide Customer List');
   const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
+  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
   const partialOrdersSheet = spreadsheet.getSheetByName('Partial Orders');
-  const enteredByNamesAndApprovalStatus = lodgeOrdersSheet.getSheetValues(3, 2, lodgeOrdersSheet.getLastRow() - 2, 3);
+  const enteredByNamesAndApprovalStatus = lodgeOrdersSheet.getSheetValues(3, 2, lodgeOrdersSheet.getLastRow() - 2, 3).concat(guideOrdersSheet.getSheetValues(3, 2, guideOrdersSheet.getLastRow() - 2, 3));
   const customerNames = lodgeCustomerSheet.getSheetValues(3, 1, lodgeCustomerSheet.getLastRow() - 2, 3).concat(charterGuideCustomerSheet.getSheetValues(3, 1, charterGuideCustomerSheet.getLastRow() - 2, 3))
   const orderNumbers_BO = partialOrdersSheet.getSheetValues(2, 1, partialOrdersSheet.getRange(partialOrdersSheet.getLastRow(), 1).getNextDataCell(SpreadsheetApp.Direction.UP).getRow() - 1, 1).flat()
 
