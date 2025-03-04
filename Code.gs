@@ -149,7 +149,7 @@ function installedOnOpen(e)
 function addItemsToTransferSheet()
 {
   const activeSheet = SpreadsheetApp.getActiveSheet();
-  var activeRanges = activeSheet.getActiveRangeList().getRanges(); // The selected ranges on the item search sheet
+  var activeRanges = activeSheet.getActiveRangeList().getRanges(); // The selected ranges
   var firstRows = [], lastRows = [], numRows = [], values, sku = [], qty = [], name = [], ordNum = [];
   
   // Find the first row and last row in the the set of all active ranges
@@ -344,160 +344,160 @@ function addSelectedRowsToNewLodgeTracker()
   }
 }
 
-/**
- * This function allows the user to add order from the LODGE ORDERS or GUIDE ORDERS page to the relevant transfer sheet.
- * 
- * @author Jarren Ralf
- */
-function addOrdersToTransferSheet()
-{
-  const activeSheet = SpreadsheetApp.getActiveSheet();
-  const firstRows = [], lastRows = [], numRows = [], values = [];
+// /**
+//  * This function allows the user to add order from the LODGE ORDERS or GUIDE ORDERS page to the relevant transfer sheet.
+//  * 
+//  * @author Jarren Ralf
+//  */
+// function addOrdersToTransferSheet()
+// {
+//   const activeSheet = SpreadsheetApp.getActiveSheet();
+//   const firstRows = [], lastRows = [], numRows = [], values = [];
     
-  SpreadsheetApp.getActive().getActiveRangeList().getRanges().map((activeRange, r) => {
-    firstRows.push(activeRange.getRow())
-     lastRows.push(activeRange.getLastRow())
-      numRows.push(lastRows[r] - firstRows[r] + 1)
-       values.push(...activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
-  })
+//   SpreadsheetApp.getActive().getActiveRangeList().getRanges().map((activeRange, r) => {
+//     firstRows.push(activeRange.getRow())
+//      lastRows.push(activeRange.getLastRow())
+//       numRows.push(lastRows[r] - firstRows[r] + 1)
+//        values.push(...activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
+//   })
 
-  if (Math.min(...firstRows) < 3)
-    Browser.msgBox('Please select items from the list.')
-  else
-  {
-    const spreadsheet = SpreadsheetApp.getActive()
-    const sheetName = activeSheet.getSheetName();
-    const today = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(), 'dd MMM yyyy');
-    var row = 0, numOrders = 0, sheet, itemValues, fromLocation, toLocation, url;
+//   if (Math.min(...firstRows) < 3)
+//     Browser.msgBox('Please select items from the list.')
+//   else
+//   {
+//     const spreadsheet = SpreadsheetApp.getActive()
+//     const sheetName = activeSheet.getSheetName();
+//     const today = Utilities.formatDate(new Date(), spreadsheet.getSpreadsheetTimeZone(), 'dd MMM yyyy');
+//     var row = 0, numOrders = 0, sheet, itemValues, fromLocation, toLocation, url;
 
-    var ui = SpreadsheetApp.getUi();
+//     var ui = SpreadsheetApp.getUi();
 
-    var response = ui.prompt('Which PNT location are you shipping FROM?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+//     var response = ui.prompt('Which PNT location are you shipping FROM?', 'Please type: \"rich", \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
 
-    // Process the user's response.
-    if (response.getSelectedButton() == ui.Button.OK)
-    {
-      var textResponse = response.getResponseText().toUpperCase();
+//     // Process the user's response.
+//     if (response.getSelectedButton() == ui.Button.OK)
+//     {
+//       var textResponse = response.getResponseText().toUpperCase();
 
-      if (textResponse == 'RICH')
-      {
-        fromLocation = 'Richmond';
+//       if (textResponse == 'RICH')
+//       {
+//         fromLocation = 'Richmond';
 
-        response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
+//         response = ui.prompt('Which PNT location are you shipping TO?', 'Please type: \"parks\", or \"pr\".', ui.ButtonSet.OK_CANCEL);
 
-        // Process the user's response.
-        if (response.getSelectedButton() == ui.Button.OK)
-        {
-          textResponse = response.getResponseText().toUpperCase();
+//         // Process the user's response.
+//         if (response.getSelectedButton() == ui.Button.OK)
+//         {
+//           textResponse = response.getResponseText().toUpperCase();
 
-          if (textResponse == 'PARKS')
-            toLocation = 'Parskville'
-          else if (textResponse == 'PR')
-            toLocation = 'Rupert'
-          else
-            ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
-        }
-        else // The user has clicked on CLOSE or CANCEL
-          return;
-      }
-      else if (textResponse == 'PARKS')
-      {
-        toLocation = 'Richmond';
-        fromLocation = 'Parksville';
-      }
-      else if (textResponse == 'PR')
-      {
-        toLocation = 'Richmond';
-        fromLocation = 'Rupert';
-      }
-      else
-        ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
-    }
-    else // The user has clicked on CLOSE or CANCEL
-      return;
+//           if (textResponse == 'PARKS')
+//             toLocation = 'Parskville'
+//           else if (textResponse == 'PR')
+//             toLocation = 'Rupert'
+//           else
+//             ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+//         }
+//         else // The user has clicked on CLOSE or CANCEL
+//           return;
+//       }
+//       else if (textResponse == 'PARKS')
+//       {
+//         toLocation = 'Richmond';
+//         fromLocation = 'Parksville';
+//       }
+//       else if (textResponse == 'PR')
+//       {
+//         toLocation = 'Richmond';
+//         fromLocation = 'Rupert';
+//       }
+//       else
+//         ui.alert('Your typed response did not exactly match any of the location choices. Please Try again.')
+//     }
+//     else // The user has clicked on CLOSE or CANCEL
+//       return;
 
-    switch (fromLocation)
-    {
-      case 'Richmond':
+//     switch (fromLocation)
+//     {
+//       case 'Richmond':
 
-        switch (toLocation)
-        {
-          case 'Parskville':
-            url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
-            sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-            itemValues = values.map(value => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Jesse (Lodge Order)']) 
-            row = sheet.getLastRow() + 1;
-            numOrders = itemValues.length;
-            sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
-            applyFullRowFormatting(sheet, row, numOrders, false)
-            break;
-          case 'Rupert':
-            url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
-            sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
-            itemValues = values.map(value => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Doug (Lodge Order)'])
-            row = sheet.getLastRow() + 1;
-            numOrders = itemValues.length;
-            sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
-            applyFullRowFormatting(sheet, row, numOrders, false)
-            break;
-        }
-        break;
-      case 'Parksville':
-        url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
-        sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-        itemValues = values.map(value => 
-          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Order)']
-        ) 
-        row = sheet.getLastRow() + 1;
-        numOrders = itemValues.length;
-        sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
-        applyFullRowFormatting(sheet, row, numOrders, true)
-        break;
-      case 'Rupert':
-        url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
-        sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
-        itemValues = values.map(value => 
-          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Items)']
-        ) 
-        row = sheet.getLastRow() + 1;
-        numOrders = itemValues.length;
-        sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
-        applyFullRowFormatting(sheet, row, numOrders, true)
-        break;
-    }
+//         switch (toLocation)
+//         {
+//           case 'Parskville':
+//             url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
+//             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+//             itemValues = values.map(value => 
+//               [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Jesse (Lodge Order)']) 
+//             row = sheet.getLastRow() + 1;
+//             numOrders = itemValues.length;
+//             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
+//             applyFullRowFormatting(sheet, row, numOrders, false)
+//             break;
+//           case 'Rupert':
+//             url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
+//             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
+//             itemValues = values.map(value => 
+//               [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Doug (Lodge Order)'])
+//             row = sheet.getLastRow() + 1;
+//             numOrders = itemValues.length;
+//             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
+//             applyFullRowFormatting(sheet, row, numOrders, false)
+//             break;
+//         }
+//         break;
+//       case 'Parksville':
+//         url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
+//         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+//         itemValues = values.map(value => 
+//           [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Order)']
+//         ) 
+//         row = sheet.getLastRow() + 1;
+//         numOrders = itemValues.length;
+//         sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
+//         applyFullRowFormatting(sheet, row, numOrders, true)
+//         break;
+//       case 'Rupert':
+//         url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
+//         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
+//         itemValues = values.map(value => 
+//           [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Items)']
+//         ) 
+//         row = sheet.getLastRow() + 1;
+//         numOrders = itemValues.length;
+//         sheet.getRange(row, 1, numOrders, 5).setNumberFormat('@').setValues(itemValues)
+//         applyFullRowFormatting(sheet, row, numOrders, true)
+//         break;
+//     }
 
-    if (fromLocation != undefined && toLocation != undefined && (sheetName == 'LODGE ORDERS' || sheetName == 'GUIDE ORDERS' || sheetName == 'LODGE COMPLETED' || sheetName == 'GUIDE COMPLETED'))
-    {
-      SpreadsheetApp.flush();
-      const additionalTransferSheetHyperlinkText = '\nShipping from ' + fromLocation + ' to ' + toLocation;
-      var fullText, fullTextLength, richText_Notes_Runs, numRuns = 0, rng;
+//     if (fromLocation != undefined && toLocation != undefined && (sheetName == 'LODGE ORDERS' || sheetName == 'GUIDE ORDERS' || sheetName == 'LODGE COMPLETED' || sheetName == 'GUIDE COMPLETED'))
+//     {
+//       SpreadsheetApp.flush();
+//       const additionalTransferSheetHyperlinkText = '\nShipping from ' + fromLocation + ' to ' + toLocation;
+//       var fullText, fullTextLength, richText_Notes_Runs, numRuns = 0, rng;
 
-      numRows.map((nRows, r) => {
-        rng = activeSheet.getRange(firstRows[r], 11, nRows, 1);
-        richText_Notes = rng.getRichTextValues().map(note_RichText => {
-          fullText = note_RichText[0].getText()
-          fullTextLength = fullText.length;
-          richText_Notes_Runs = note_RichText[0].getRuns().map(run => [run.getStartIndex(), run.getEndIndex(), run.getTextStyle()]);
-          numRuns = richText_Notes_Runs.length;
+//       numRows.map((nRows, r) => {
+//         rng = activeSheet.getRange(firstRows[r], 11, nRows, 1);
+//         richText_Notes = rng.getRichTextValues().map(note_RichText => {
+//           fullText = note_RichText[0].getText()
+//           fullTextLength = fullText.length;
+//           richText_Notes_Runs = note_RichText[0].getRuns().map(run => [run.getStartIndex(), run.getEndIndex(), run.getTextStyle()]);
+//           numRuns = richText_Notes_Runs.length;
 
-          if (!isBlank(fullText))
-            for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + additionalTransferSheetHyperlinkText); i < numRuns; i++)
-              richTextBuilder.setTextStyle(richText_Notes_Runs[i][0], richText_Notes_Runs[i][1], richText_Notes_Runs[i][2])
-          else 
-            return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()]
+//           if (!isBlank(fullText))
+//             for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + additionalTransferSheetHyperlinkText); i < numRuns; i++)
+//               richTextBuilder.setTextStyle(richText_Notes_Runs[i][0], richText_Notes_Runs[i][1], richText_Notes_Runs[i][2])
+//           else 
+//             return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()]
           
-          return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + additionalTransferSheetHyperlinkText.length, url + '&range=B' + row).build()];
-        });
+//           return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + additionalTransferSheetHyperlinkText.length, url + '&range=B' + row).build()];
+//         });
 
-        rng.setRichTextValues(richText_Notes)
-      });
+//         rng.setRichTextValues(richText_Notes)
+//       });
 
-      spreadsheet.toast('Click on the link and and make the necessary changes to the Transfer sheet', 'Order(s) Added to Transfer Sheet', -1)
-    }
-  }
-}
+//       spreadsheet.toast('Click on the link and and make the necessary changes to the Transfer sheet', 'Order(s) Added to Transfer Sheet', -1)
+//     }
+//   }
+// }
 
 /**
  * Apply the proper formatting to the Order, Shipped, Received, ItemsToRichmond, Manual Counts, or InfoCounts page.
@@ -1007,10 +1007,7 @@ function moveRow(e, sheet, spreadsheet)
           const numCols = sheet.getLastColumn()
 
           if (value == 'Updated')
-          {
-            range.setValue('')
-            sheet.getRange(row, 5).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00')
-          }
+            range.setValue('').offset(0, 5 - col).setValue('').offset(0, -4, 1, numCols).setBackground('#00ff00');
           else if (value == 'Picking')
           {
             const rowValues = sheet.getSheetValues(row, 1, 1, numCols)[0]; // Entire row values
@@ -1019,7 +1016,7 @@ function moveRow(e, sheet, spreadsheet)
             {
               const ui = SpreadsheetApp.getUi()
               ui.alert('Order NOT Approved', 'You have started picking an order that may not be approved by the customer yet.\n\nYou may want to check with ' + 
-                sheet.getRange(row, 2).getValue() + ' before picking any items.', ui.ButtonSet.OK)
+                rowValues[1] + ' before picking any items.', ui.ButtonSet.OK)
             }
           }
           else
@@ -1047,7 +1044,7 @@ function moveRow(e, sheet, spreadsheet)
             {
               rowValues[3] = true;
               spreadsheet.getSheetByName(sheetNames.pop() +  " COMPLETED").appendRow(rowValues); // Move the row of values to the completed page
-              sheet.getRange(row, 12, 1, 4).setValues([['multiple', '', '',  'Partial Order']]).offset(0, -8, 1, 1).check(); // Clear the invoice values, and set the status
+              sheet.getRange(row, 11, 1, 4).setValues([['multiple', '', '',  'Partial Order']]).offset(0, -7, 1, 1).check(); // Clear the invoice values, and set the status
               deleteBackOrderedItems(rowValues[2], spreadsheet);
             }
           }
@@ -1068,7 +1065,7 @@ function moveRow(e, sheet, spreadsheet)
         }
         else if (col == 4) // The approval of an order has changed
         {
-          if (isBlank(range.offset(0, 8).getValue())) // Is this order an inital order?
+          if (isBlank(range.offset(0, 7).getValue())) // Is this order an inital order?
           {
             const approval = range.isChecked();
             const approvedOrderNumber = range.offset(0, -1).getValue();
@@ -1146,7 +1143,7 @@ function setColumnWidths()
   const lodgeCompletedSheet = spreadsheet.getSheetByName('LODGE COMPLETED');
   const guideCompletedSheet = spreadsheet.getSheetByName('GUIDE COMPLETED');
   const cancelledSheet = spreadsheet.getSheetByName('CANCELLED');
-  const widths = [80, 80, 68, 54, 80, 61, 200, 84, 120, 120, 300, 91, 63, 79, 70, 104];
+  const widths = [80, 80, 68, 54, 80, 61, 200, 84, 150, 150, 500, 63, 79, 70, 104];
   const numCols = widths.length;
 
   for (var c = 1; c < numCols; c++)
@@ -1475,21 +1472,21 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
             (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
             || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
           && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
-          return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', '', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Lodge Completed
+          return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Lodge Completed
         }) : 
       allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
         ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
-        return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', '', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Lodge Completed
+        return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Lodge Completed
       })) :
     allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
         (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
         || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
       && order[isOrderCompleteIdx] === 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => { 
-      return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', '', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Lodge Orders
+      return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Lodge Orders
   });
 
   const newCharterGuideOrders = 
@@ -1500,21 +1497,21 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
             (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
             || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
           && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
-          return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', '', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Charter & Guide Completed
+          return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Charter & Guide Completed
         }) : 
       allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
         ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
-        return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', '', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Charter & Guide Completed
+        return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders), getDateString(order[invoiceDateIdx], months)] // Charter & Guide Completed
       })) :
     allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
         (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
         || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
       && order[isOrderCompleteIdx] === 'No' && !charterGuideOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
-      return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', '', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Charter & Guide Orders
+      return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], isCompletedOrders), '', '', getOrderStatus(order[isOrderCompleteIdx], isCompletedOrders, order[invoiceNumIdx])] // Charter & Guide Orders
   });
 
   const numNewLodgeOrder = newLodgeOrders.length;
@@ -1526,11 +1523,11 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     if (isCompletedOrders)
       lodgeCompletedSheet.activate().getRange(numCompletedLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-          .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newLodgeOrders)
-        .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 16, ascending: true}, {column: 1, ascending: true}]);
+          .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newLodgeOrders)
+        .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 15, ascending: true}, {column: 1, ascending: true}]);
     else
       lodgeOrdersSheet.activate().getRange(numLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-          .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@']))
+          .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@']))
           .setFontColor('black').setFontLine('none').setValues(newLodgeOrders)
         .offset(-1*numLodgeOrders, 0, numLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 1, ascending: true}]);
 
@@ -1546,11 +1543,11 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     if (isCompletedOrders)
       charterGuideCompletedSheet.getRange(numCompletedCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols)
-          .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newCharterGuideOrders)
-        .offset(-1*numCompletedCharterGuideOrders, 0, numCompletedCharterGuideOrders + numNewCharterGuideOrder, numCols).sort([{column: 16, ascending: true}, {column: 1, ascending: true}]);
+          .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newCharterGuideOrders)
+        .offset(-1*numCompletedCharterGuideOrders, 0, numCompletedCharterGuideOrders + numNewCharterGuideOrder, numCols).sort([{column: 15, ascending: true}, {column: 1, ascending: true}]);
     else
       charterGuideOrdersSheet.getRange(numCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols)
-          .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@'])).setValues(newCharterGuideOrders)
+          .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@'])).setValues(newCharterGuideOrders)
         .offset(-1*numCharterGuideOrders, 0, numCharterGuideOrders + numNewCharterGuideOrder, numCols).sort([{column: 1, ascending: true}]);
 
     Logger.log('The following new Charter and Guide orders were added to the tracker:')
@@ -1565,13 +1562,13 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     if (lodgeCompletedSheet.getLastRow() > 2)
     {
-      const completedLodgeOrderNumbers = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 13)
-        .filter(ord => ord[12] === 'Completed')
+      const completedLodgeOrderNumbers = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 12)
+        .filter(ord => ord[11] === 'Completed')
         .map(ord => ord[0]).flat()
         .filter(ordNum => ordNum !== ''); 
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
-      const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
+      const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
         .filter(currentOrd => {
 
           isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]);
@@ -1585,20 +1582,20 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       var numCurrentLodgeOrders = currentLodgeOrders.length;
 
       if (numCurrentLodgeOrders < numLodgeOrders)
-        lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, numCurrentLodgeOrders, 15).setValues(currentLodgeOrders);
+        lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).clearContent().offset(0, 0, numCurrentLodgeOrders, 14).setValues(currentLodgeOrders);
     }
     else
       var numCurrentLodgeOrders = numLodgeOrders;
 
     if (charterGuideCompletedSheet.getLastRow() > 2)
     {
-      const completedCharterGuideOrderNumbers = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 13)
-        .filter(ord => ord[12] === 'Completed')
+      const completedCharterGuideOrderNumbers = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 12)
+        .filter(ord => ord[11] === 'Completed')
         .map(ord => ord[2]).flat()
         .filter(ordNum => ordNum !== '');
 
       Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
-      const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
+      const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14)
         .filter(currentOrd => {
 
           isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]);
@@ -1612,7 +1609,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       var numCurrentCharterGuideOrders = currentCharterGuideOrders.length;
 
       if (numCurrentCharterGuideOrders < numCharterGuideOrders)
-        charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 15).setValues(currentCharterGuideOrders);
+        charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
     }
     else
       var numCurrentCharterGuideOrders = numCharterGuideOrders;
@@ -1622,7 +1619,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [], today = new Date();
     SpreadsheetApp.flush();
     const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => ordNum !== ''); 
-    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 15)
+    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
       .filter(currentOrd => {
 
         isLodgeOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
@@ -1637,7 +1634,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         return !isLodgeOrderCancelled;
     });
 
-    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 15)
+    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14)
       .filter(currentOrd => {
 
         isCharterGuideOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
@@ -1659,7 +1656,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     if (numCancelledOrders > 0)
     {
       const cancelledSheet = spreadsheet.getSheetByName('CANCELLED')
-      cancelledSheet.getRange(cancelledSheet.getLastRow() + 1, 1, numCancelledOrders, 16)
+      cancelledSheet.getRange(cancelledSheet.getLastRow() + 1, 1, numCancelledOrders, 15)
         .setNumberFormats(new Array(numCancelledOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy']))
         .setValues(cancelledOrders)
       Logger.log('The following orders were removed from the tracker and placed on the CANCELLED page because they were NOT found in OrderEntry:')
@@ -1667,10 +1664,10 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     }
 
     if (numCurrentLodgeOrders < numLodgeOrders)
-      lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 15).clearContent().offset(0, 0, numCurrentLodgeOrders, 15).setValues(currentLodgeOrders);
+      lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).clearContent().offset(0, 0, numCurrentLodgeOrders, 14).setValues(currentLodgeOrders);
 
     if (numCurrentCharterGuideOrders < numCharterGuideOrders)
-      charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 15).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 15).setValues(currentCharterGuideOrders);
+      charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
   }
 
   spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
