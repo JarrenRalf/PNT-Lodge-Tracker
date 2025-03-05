@@ -1888,10 +1888,12 @@ function updatePriceAndCostOfLeadAndFrozenBait()
  */
 function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 {
+  spreadsheet = SpreadsheetApp.getActive()
   allPurchaseOrders.pop(); // Remove the "Total" or final line
 
   // Get all the indexes of the relevant headers
   const headerOE = allPurchaseOrders.shift();
+  const numPOs = allPurchaseOrders.length;
   const dateIdx = headerOE.indexOf('Order Date');
   const shipToLocationIdx = headerOE.indexOf('Shipto');
   const poNumberIdx = headerOE.indexOf('Document');
@@ -1901,13 +1903,20 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const poDescriptionIdx = headerOE.indexOf('Description');
   const poTotalValueIdx = headerOE.indexOf('Total Value');
   const poStatusIdx = headerOE.indexOf('Automatic Style Code');
-  
-  //const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
-
-  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS')
-  const currentYear = new Date().getFullYear().toString()
-  const lastYear = new Date().getFullYear().toString()
-  const lodgeSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  const poItemsSheet = spreadsheet.getSheetByName('P/O')
+  const numItemsOnPos = poItemsSheet.getLastRow() - 2;
+  const numCols_PoItems = poItemsSheet.getLastColumn();
+  var poItems = poItemsSheet.getSheetValues(3, 1, numItemsOnPos, numCols_PoItems);
+  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
+  const itemManagement_NumRows = itemManagementSheet.getLastRow() - 1;
+  const itemManagement_Po_Range = itemManagementSheet.getRange(2, 7, itemManagement_NumRows, 1);
+  const itemManagement_Po = itemManagement_Po_Range.getValues().filter(u => !isBlank(u[0])).flat();
+  const itemManagement_NonLodgePo_Range = itemManagementSheet.getRange(2, 9, itemManagement_NumRows, 1);
+  const itemManagement_NonLodgePo = itemManagement_NonLodgePo_Range.getValues().filter(v => !isBlank(v[0])).flat();
+  const currentYear = new Date().getFullYear().toString();
+  const lastYear = new Date().getFullYear().toString();
+  const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  var numPOsAdded = 0, numPOsRemoved = 0, itemManagement_Po_Idx = -1, itemManagement_NonLodgePo_Idx = -1;
 
   if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
@@ -1915,38 +1924,70 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
     var isCurrentLodgeSeasonYear = true;
 
-  const allPos = allPurchaseOrders.filter(order => order[poStatusIdx] !== 'PO Completed' && 
-    ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
-      (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
-      || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear)))
-  //     .map(order => {
-  //   return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', '', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Lodge Completed
-  // }) 
+  for (var i = 0; i < numPOs; i++)
+  {
+    // Make sure the PO is for this year
+    if (((includeLastYearsFinalQuarterOrders && allPurchaseOrders[i][dateIdx].toString().substring(6) === lastYear &&
+      (allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '09' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '10' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '11' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '12')) 
+      || (isCurrentLodgeSeasonYear && allPurchaseOrders[i][dateIdx].toString().substring(6) === currentYear)))
+    {
+      if (allPurchaseOrders[i][poStatusIdx] !== 'PO Completed')
+      {
+        if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx]) && !itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
+        {
+          itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
+          numPOsAdded++;
+        }
+      }
+      else // PO is complete
+      {
+        // Remove all lines that match this PO number from the P/O sheet
+        itemManagement_Po_Idx = itemManagement_Po.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
+        itemManagement_NonLodgePo_Idx = itemManagement_NonLodgePo.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
 
-  Logger.log(allPos.length)
-  Logger.log(allPos)
+        if (itemManagement_Po_Idx !== -1)
+        {
+          itemManagement_Po[itemManagement_Po_Idx] = false;
+          numPOsRemoved++;
+        }
 
-  // if (numNewLodgeOrder > 0)
-  // {
-  //   var numCols = newLodgeOrders[0].length;
+        if (itemManagement_NonLodgePo_Idx !== -1)
+        {
+          itemManagement_NonLodgePo[itemManagement_NonLodgePo_Idx] = false;
+          numPOsRemoved++;
+        }
 
-  //   if (isCompletedOrders)
-  //     lodgeCompletedSheet.activate().getRange(numCompletedLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-  //         .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newLodgeOrders)
-  //       .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 16, ascending: true}, {column: 1, ascending: true}]);
-  //   else
-  //     lodgeOrdersSheet.activate().getRange(numLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-  //         .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@']))
-  //         .setFontColor('black').setFontLine('none').setValues(newLodgeOrders)
-  //       .offset(-1*numLodgeOrders, 0, numLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 1, ascending: true}]);
+        poItems = poItems.filter(poNum => poNum[9] !== allPurchaseOrders[i][poNumberIdx]); // Remove the items from the P/O page
+      }
+    }
+  }
 
-  //   Logger.log('The following new Lodge orders were added to the tracker:')
-  //   Logger.log(newLodgeOrders)
+  var numPoItemsRemoved = 0;
 
-  //   deleteBackOrderedItems(newLodgeOrders, spreadsheet);
-  // }
+  if (numPOsAdded !== 0 || numPOsRemoved !== 0)
+  {
+    const itemManagement_Po_Updated = itemManagement_Po.filter(u => u).sort().map(v => [v]);
+    itemManagement_Po_Range.clearContent().offset(0, 0, itemManagement_Po_Updated.length).setValues(itemManagement_Po_Updated);
 
-  // spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+    const itemManagement_NonLodgePo_Updated = itemManagement_NonLodgePo.filter(u => u).sort().map(v => [v]);
+    itemManagement_NonLodgePo_Range.clearContent().offset(0, 0, itemManagement_NonLodgePo_Updated.length).setValues(itemManagement_NonLodgePo_Updated);
+
+    const numCurrentItems = poItems.length
+
+    if (numCurrentItems < numItemsOnPos)
+    {
+      numPoItemsRemoved = numItemsOnPos - numCurrentItems;
+      poItemsSheet.getRange(3, 1, numCurrentItems, numCols_PoItems).setValues(poItems)
+      poItemsSheet.deleteRows(numCurrentItems + 3, numPoItemsRemoved);
+    }
+  }
+
+  Logger.log('numPOsAdded: ' + numPOsAdded)
+  Logger.log('numPOsRemoved: ' + numPOsRemoved)
+  Logger.log('numPoItemsRemoved: ' + numPoItemsRemoved)
+
+  itemManagementSheet.getRange('G2').activate();
+  spreadsheet.toast(numPOsAdded + ' Added ' + numPOsRemoved + ' Removed   ' + numPoItemsRemoved + ' Items Removed from P/O sheet', 'POs Imported', 60)
 }
 
 /**
