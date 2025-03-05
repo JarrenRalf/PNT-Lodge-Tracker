@@ -1888,7 +1888,6 @@ function updatePriceAndCostOfLeadAndFrozenBait()
  */
 function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 {
-  spreadsheet = SpreadsheetApp.getActive()
   allPurchaseOrders.pop(); // Remove the "Total" or final line
 
   // Get all the indexes of the relevant headers
@@ -1993,32 +1992,36 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 /**
  * This function handles the import of the list of receipts into the spreadsheet.
  * 
- * @param {String[][]} allPoReceipts : All of the current receipts from Adagio.
+ * @param {String[][]} allReceipts : All of the current receipts from Adagio.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @author Jarren Ralf
  */
-function updatePoReceiptsOnTracker(allPoReceipts, spreadsheet)
+function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
 {
-  allPoReceipts.pop(); // Remove the "Total" or final line
+  allReceipts.pop(); // Remove the "Total" or final line
 
   // Get all the indexes of the relevant headers
-  const headerOE = allPoReceipts.shift();
-  const dateIdx = headerOE.indexOf('Order Date');
+  const headerOE = allReceipts.shift();
+  const numReceipts = allReceipts.length;
+  const orderDateIdx = headerOE.indexOf('Order Date');
   const shipToLocationIdx = headerOE.indexOf('Shipto');
-  const poNumberIdx = headerOE.indexOf('Document');
+  const poNumberIdx = headerOE.indexOf('Original Doc');
+  const receiptNumberIdx = headerOE.indexOf('Document');
+  const receiptDateIdx = headerOE.indexOf('Receipt Date');
   const vendorNumberIdx = headerOE.indexOf('Vendor');
   const vendorNameIdx = headerOE.indexOf('Vend Name');
-  const poReferenceIdx = headerOE.indexOf('Reference');
-  const poDescriptionIdx = headerOE.indexOf('Description');
-  const poTotalValueIdx = headerOE.indexOf('Total Value');
-  const poStatusIdx = headerOE.indexOf('Automatic Style Code');
-  
-  //const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
-
-  const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS')
-  const currentYear = new Date().getFullYear().toString()
-  const lastYear = new Date().getFullYear().toString()
-  const lodgeSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  const receiptReferenceIdx = headerOE.indexOf('Reference');
+  const receiptDescriptionIdx = headerOE.indexOf('Description');
+  const receiptTotalValueIdx = headerOE.indexOf('Total Value');
+  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
+  const itemManagement_NumRows = itemManagementSheet.getLastRow() - 1;
+  const itemManagement_Receipt = itemManagementSheet.getSheetValues(2, 12, itemManagement_NumRows, 1).filter(u => !isBlank(u[0])).flat();
+  const itemManagement_NonLodgeReceipt = itemManagementSheet.getSheetValues(2, 14, itemManagement_NumRows, 1).filter(v => !isBlank(v[0])).flat();
+  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagement_NumRows, 2).filter(u => !isBlank(u[1]))
+  const currentYear = new Date().getFullYear().toString();
+  const lastYear = new Date().getFullYear().toString();
+  const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  var numReceiptsAdded = 0;
 
   if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
@@ -2026,38 +2029,27 @@ function updatePoReceiptsOnTracker(allPoReceipts, spreadsheet)
   if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
     var isCurrentLodgeSeasonYear = true;
 
-  const allPos = allPoReceipts.filter(order => order[poStatusIdx] !== 'PO Completed' && 
-    ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
-      (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
-      || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear)))
-  //     .map(order => {
-  //   return [getDateString(order[dateIdx], months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', '', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx], months)] // Lodge Completed
-  // }) 
+  for (var i = 0; i < numReceipts; i++)
+  {
+    // Make sure the Receipt is for this year
+    if (((includeLastYearsFinalQuarterOrders && allReceipts[i][orderDateIdx].toString().substring(6) === lastYear &&
+      (allReceipts[i][orderDateIdx].toString().substring(0, 2) === '09' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '10' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '11' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '12')) 
+      || (isCurrentLodgeSeasonYear && allReceipts[i][orderDateIdx].toString().substring(6) === currentYear)))
+    {
+      if (!itemManagement_Receipt.includes(allReceipts[i][receiptNumberIdx]) && !itemManagement_NonLodgeReceipt.includes(allReceipts[i][receiptNumberIdx])) // This PO is not in either item managment PO list
+      {
+        itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
+        numReceiptsAdded++;
+      }
+    }
+  }
 
-  Logger.log(allPos.length)
-  Logger.log(allPos)
+  if (numReceiptsAdded > 0)
+    itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos).activate()
 
-  // if (numNewLodgeOrder > 0)
-  // {
-  //   var numCols = newLodgeOrders[0].length;
+  Logger.log('numReceiptsAdded: ' + numReceiptsAdded)
 
-  //   if (isCompletedOrders)
-  //     lodgeCompletedSheet.activate().getRange(numCompletedLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-  //         .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newLodgeOrders)
-  //       .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 16, ascending: true}, {column: 1, ascending: true}]);
-  //   else
-  //     lodgeOrdersSheet.activate().getRange(numLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
-  //         .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@']))
-  //         .setFontColor('black').setFontLine('none').setValues(newLodgeOrders)
-  //       .offset(-1*numLodgeOrders, 0, numLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 1, ascending: true}]);
-
-  //   Logger.log('The following new Lodge orders were added to the tracker:')
-  //   Logger.log(newLodgeOrders)
-
-  //   deleteBackOrderedItems(newLodgeOrders, spreadsheet);
-  // }
-
-  // spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast(numReceiptsAdded + ' Added ', 'Receipts Imported', 60)
 }
 
 /**
