@@ -89,8 +89,10 @@ function onEdit(e)
     else if (sheetName === 'Item Management (Jarren Only ;)')
       manageDocumentNumbers(e, sheet, spreadsheet)
   }
-  catch (error)
+  catch (err)
   {
+    var error = err['stack'] 
+    Logger.log(error)
     Browser.msgBox(error)
   }
 }
@@ -954,15 +956,36 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
   if (row > 1 && (col === 7 || col === 12) && (colEnd === 7 || colEnd === 12) && row === range.rowEnd)
   {
     const deletedDocumentNumber = e.oldValue;
+    const numRows = sheet.getLastRow() - row + 1;
 
-    if (col !== 12) // PO
+    if (col !== 12) // POs
     {
-      range.offset(sheet.getSheetValues(row, col + 2, sheet.getLastRow() - row + 1, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+      const poNumbersRange = sheet.getRange(row, col, numRows, 1)
+      const poNumbers = poNumbersRange.getValues().filter(poNum => !isBlank(poNum[0]))
+      const numPos = poNumbers.length;
+
+      if (numPos > 0)
+        poNumbersRange.clearContent() // Necessary for making sure the po number at the bottom is not duplicated
+          .offset(0, 0, numPos, 1).setValues(poNumbers)  // Shift the po numbers up 1
+          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+      else
+        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+      
       spreadsheet.toast('Added to bottom of Non-Lodge PO #s', deletedDocumentNumber)
     }
-    else // Receipt
+    else // Receipts
     {
-      range.offset(0, -1).setValue('').offset(sheet.getSheetValues(row, col + 2, sheet.getLastRow() - row + 1, 1).findIndex(rctNum => isBlank(rctNum[0])), 3).setValue(deletedDocumentNumber)
+      const poAndReceiptNumbersRange = sheet.getRange(row, col - 1, numRows, 2)
+      const poAndReceiptNumbers = poAndReceiptNumbersRange.getValues().filter(rctNum => !isBlank(rctNum[1]))
+      const numReceipts = poAndReceiptNumbers.length
+
+      if (numReceipts > 0)
+        poAndReceiptNumbersRange.clearContent() // Necessary for making sure the receipt number at the bottom is not duplicated
+          .offset(0, 0, poAndReceiptNumbers.length, 2).setValues(poAndReceiptNumbers) // Shift the po and receipt numbers up 1
+          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(rctNum => isBlank(rctNum[0])), 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
+      else
+        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(rctNum => isBlank(rctNum[0])), 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
+      
       spreadsheet.toast('Added to bottom of Non-Lodge Rct #s', deletedDocumentNumber)
     }
   }
