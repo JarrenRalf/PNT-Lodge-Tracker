@@ -1,7 +1,5 @@
 /**
  * Send an automated email weekly with all of the lines from the IO / BO / PO tabs that have nothing written in the Notes column. Accompany the information with the relevant orders from the Lodge Orders page.
- * 
- * Also, import PO numbers to auto delete the POs that have already been received.
  */
 
 /**
@@ -15,7 +13,7 @@ function onChange(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, isAdagioPO_Receipts = 6, isBackOrderItems = 7, isPurchaseOrderItems = 8, isReceivedItems = 9, nRows = 0, nCols = 0;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -32,9 +30,10 @@ function onChange(e)
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')        : false, // There is a sheet with no rows and no columns
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Automatic Style Code')   : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Receipt Date')           : false, 
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered')   : false, 
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false,
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false 
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false
+           
         ]
 
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
@@ -52,6 +51,8 @@ function onChange(e)
 
           if (info[isAdagioOE])
             updateOrdersOnTracker(values, spreadsheet);
+          else if (info[isReceivedItems])
+            updateReceivedItemsOnTracker(values, spreadsheet);
           else if (info[isAdagioPO])
             updatePurchaseOrdersOnTracker(values, spreadsheet);
           else if (info[isAdagioPO_Receipts])
@@ -60,9 +61,7 @@ function onChange(e)
             updateItemsOnTracker(values, spreadsheet, fileName);
           else if (info[isPurchaseOrderItems])
             updatePoItemsOnTracker(values, spreadsheet);
-          else if (info[isReceivedItems])
-            updateReceivedItemsOnTracker(values, spreadsheet);
-
+          
           break;
         }
       }
@@ -85,8 +84,10 @@ function onEdit(e)
   {
     if (sheetName === 'Lead Cost & Pricing' || sheetName === 'Bait Cost & Pricing')
       managePriceChange(e, sheetName, spreadsheet)
-    else (sheetName.split(" ").pop() === 'ORDERS')
+    else if (sheetName.split(" ").pop() === 'ORDERS')
       moveRow(e, sheet, spreadsheet)
+    else if (sheetName === 'Item Management (Jarren Only ;)')
+      manageDocumentNumbers(e, sheet, spreadsheet)
   }
   catch (error)
   {
@@ -936,6 +937,38 @@ function isNumber(num)
 }
 
 /**
+ * This function detects when the user presses the delete key on a po or receipt number and it moves that item to the Non-Lodge column.
+ * 
+ * @param {Event Object} e : The event object.
+ * @param {Sheet} sheet : The active sheet.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf
+ */
+function manageDocumentNumbers(e, sheet, spreadsheet)
+{
+  const range = e.range;
+  const row = range.rowStart;
+  const col = range.columnStart; 
+  const colEnd = range.columnEnd; 
+
+  if (row > 1 && (col === 7 || col === 12) && (colEnd === 7 || colEnd === 12) && row === range.rowEnd)
+  {
+    const deletedDocumentNumber = e.oldValue;
+
+    if (col !== 12) // PO
+    {
+      range.offset(sheet.getSheetValues(row, col + 2, sheet.getLastRow() - row + 1, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+      spreadsheet.toast('Added to bottom of Non-Lodge PO #s', deletedDocumentNumber)
+    }
+    else // Receipt
+    {
+      range.offset(0, -1).setValue('').offset(sheet.getSheetValues(row, col + 2, sheet.getLastRow() - row + 1, 1).findIndex(rctNum => isBlank(rctNum[0])), 3).setValue(deletedDocumentNumber)
+      spreadsheet.toast('Added to bottom of Non-Lodge Rct #s', deletedDocumentNumber)
+    }
+  }
+}
+
+/**
  * This function manages the price changes on the Lead and Bait Cost & Pricing sheets.
  * 
  * @param {Event Object} e : The event object.
@@ -1686,21 +1719,19 @@ function updatePoItemsOnTracker(items, spreadsheet)
 
   // Get all the indexes of the relevant headers
   const headerOE = items.shift();
-  const dateIdx = headerOE.indexOf('Rate Date');
-  const vendorNameIdx = headerOE.indexOf('Vendor name');
   const originalOrderedQtyIdx = headerOE.indexOf('Qty Originally Ordered');
   const backOrderQtyIdx = headerOE.indexOf('Backordered'); 
   const skuIdx = headerOE.indexOf('Item#');
   const descriptionIdx = headerOE.indexOf('Description');
   const unitCostIdx = headerOE.indexOf('Unit Cost');
   const extendedUnitCostIdx = headerOE.indexOf('Extended Order Cost');
-  const locationIdx = headerOE.indexOf('Location');
-  const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
-  const orderDate = getDateString(items[0][dateIdx], months);
-  const locationName = getLocationName(items[0][locationIdx]);
+  const orderDate = getDateString(items[0][headerOE.indexOf('Rate Date')], months);
+  const locationName = getLocationName(items[0][headerOE.indexOf('Location')]);
+  const vendorName = items[0][headerOE.indexOf('Vendor name')];
+  const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
 
-  const newItems = items.map(item => [orderDate, item[vendorNameIdx], item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
+  const newItems = items.map(item => [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
       removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
   ).filter(item => item[2] !== 0 || item[3] !== 0 || isBlank(item[4])); // Remove items that have already been received, as well as keep comments / notes
 
@@ -2065,66 +2096,45 @@ function updateReceivedItemsOnTracker(items, spreadsheet)
 
   // Get all the indexes of the relevant headers
   const headerOE = items.shift();
-  const dateIdx = headerOE.indexOf('Rate Date');
-  const vendorNameIdx = headerOE.indexOf('Vendor name');
   const originalOrderedQtyIdx = headerOE.indexOf('Qty Originally Ordered');
+  const receivedQtyIdx = headerOE.indexOf('Received'); 
   const backOrderQtyIdx = headerOE.indexOf('Backordered'); 
-  const skuIdx = headerOE.indexOf('Item#');
+  const skuIdx = headerOE.indexOf('Item #');
   const descriptionIdx = headerOE.indexOf('Description');
   const unitCostIdx = headerOE.indexOf('Unit Cost');
-  const extendedUnitCostIdx = headerOE.indexOf('Extended Order Cost');
-  const locationIdx = headerOE.indexOf('Location');
-  const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
+  const extendedUnitCostIdx = headerOE.indexOf('Ext Cost');
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
-  const orderDate = getDateString(items[0][dateIdx], months);
-  const locationName = getLocationName(items[0][locationIdx]);
+  const vendorName = items[0][headerOE.indexOf('Vendor name')];
+  const receiptDate = getDateString(items[0][headerOE.indexOf('Expected Date')], months);
+  const locationName = getLocationName(items[0][headerOE.indexOf('Location')]);
+  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
+  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagementSheet.getLastRow() - 1, 2).filter(u => !isBlank(u[1]))
+  const receiptNumber = items[0][headerOE.indexOf('Rcpt #')];
+  const purchaseOrderNumber = itemManagement_ReceiptsWithPos.find(rct => rct[1] === receiptNumber)[0];
+  const recdItemSheet = spreadsheet.getSheetByName("Rec'd").activate(); 
+  const numCurrentItems = recdItemSheet.getLastRow() - 2;
+  recdItemSheet?.getFilter()?.remove(); // Remove the filter
 
-  const newItems = items.map(item => [orderDate, item[vendorNameIdx], item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
-      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
-  ).filter(item => item[2] !== 0 || item[3] !== 0 || isBlank(item[4])); // Remove items that have already been received, as well as keep comments / notes
+  Logger.log('Receipt Number: ' + receiptNumber)
 
-  const poItemSheet = spreadsheet.getSheetByName('P/O').activate(); 
-  const numRows = poItemSheet.getLastRow() - 2;
+  const newItems = items.map(item => [receiptDate, vendorName, item[originalOrderedQtyIdx], item[receivedQtyIdx], item[backOrderQtyIdx], 
+    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, receiptNumber])
+
   const numNewItems = newItems.length;
-  var numItemsRemoved = numNewItems;
-  poItemSheet?.getFilter()?.remove(); // Remove the filter
+  const numCols = newItems[0].length;
 
-  if (numRows > 0)
-  {
-    const poNum = poItemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Purchase Order #');
-    var currentItems = poItemSheet.getSheetValues(3, 1, numRows, poItemSheet.getLastColumn()).filter(item => item[poNum] !== purchaseOrderNumber);
-    var numCurrentItems = currentItems.length;
-    poItemSheet.getRange(3, 1, numCurrentItems, currentItems[0].length).setValues(currentItems);
-
-    if (numRows > numCurrentItems)
-    {
-      numItemsRemoved = numRows - numCurrentItems;
-      poItemSheet.deleteRows(numCurrentItems + 3, numItemsRemoved);
-    }
-  }
-
-  Logger.log('Purchase Order Number: ' + purchaseOrderNumber)
-
-  if (numNewItems > 0)
-  {
-    const numCols = newItems[0].length;
-
-    if (numRows > 0)
-      poItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
-        .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 1, ascending: true}]);
-    else
-      poItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
-        .setValues(newItems)
-
-    Logger.log('The following new Ordered items were added to the P/O tab:')
-    Logger.log(newItems)
-
-    spreadsheet.toast(numNewItems + ' Added ' + (numItemsRemoved - numNewItems) + ' Removed', 'P/O Items Imported', 60)
-  }
+  if (numCurrentItems > 0)
+    recdItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+        .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+      .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 1, ascending: true}]);
   else
-    spreadsheet.toast(purchaseOrderNumber + ' may be in the process of being received.', '**NO Items Imported**', 60)
+    recdItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+
+  Logger.log("The following new received items were added to the Rec'd tab:")
+  Logger.log(newItems)
+
+  spreadsheet.toast(numNewItems + ' Added ', "Rec'd Items Imported", 60)
 
   SpreadsheetApp.flush()
-  poItemSheet.getRange(2, 1, poItemSheet.getLastRow() - 1, poItemSheet.getLastColumn()).createFilter(); // Create a filter in the header
+  recdItemSheet.getRange(2, 1, recdItemSheet.getLastRow() - 1, recdItemSheet.getLastColumn()).createFilter(); // Create a filter in the header
 }
