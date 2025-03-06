@@ -1965,6 +1965,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
       {
         if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx]) && !itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
         {
+          Logger.log('Add this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
           itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
           numPOsAdded++;
         }
@@ -1978,12 +1979,14 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
         if (itemManagement_Po_Idx !== -1)
         {
           itemManagement_Po[itemManagement_Po_Idx] = false;
+          Logger.log('Remove this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
           numPOsRemoved++;
         }
 
         if (itemManagement_NonLodgePo_Idx !== -1)
         {
           itemManagement_NonLodgePo[itemManagement_NonLodgePo_Idx] = false;
+          Logger.log('Remove this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
           numPOsRemoved++;
         }
 
@@ -2070,13 +2073,14 @@ function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
       if (!itemManagement_Receipt.includes(allReceipts[i][receiptNumberIdx]) && !itemManagement_NonLodgeReceipt.includes(allReceipts[i][receiptNumberIdx])) // This PO is not in either item managment PO list
       {
         itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
+        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx])
         numReceiptsAdded++;
       }
     }
   }
 
   if (numReceiptsAdded > 0)
-    itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos).activate()
+    itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos.sort((a, b) => (a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0)).activate()
 
   Logger.log('numReceiptsAdded: ' + numReceiptsAdded)
 
