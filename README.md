@@ -1,5 +1,5 @@
 # PNT Lodge Tracker
-Link to Sample Spreadsheet: [PNT Lodge Tracker](https://docs.google.com/spreadsheets/d/1_ST_rxCWacHm2wJWy392cbftCWqbhztXF-X5l7yHE-0/edit#gid=536037086)
+Link to Sample Spreadsheet: [PNT Lodge Tracker](https://docs.google.com/spreadsheets/d/163fuzxemJ-jhV0T0oUpTIXk4nZCxKiroguSzISH4goo/edit?gid=229995253#gid=229995253)
 
 How does this spreadsheet benefit Pacific Net & Twine?
 - This spreadsheet is used to keep track of our orders that involve the lodge, charter and guide sales in the company.
