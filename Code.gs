@@ -1038,7 +1038,16 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
   if (row > 1 && (col === 7 || col === 12) && (colEnd === 7 || colEnd === 12) && row === range.rowEnd)
   {
     const deletedDocumentNumber = e.oldValue;
-    const numRows = sheet.getLastRow() - row + 1;
+    const lastRow = sheet.getLastRow() + 1
+    const numRows = lastRow - row;
+    const rowOffSet = sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(docNum => isBlank(docNum[0]));
+
+    if (rowOffSet === -1) // If there are no more rows at the bottom of the page, then add one and set the values to blanks initially
+      sheet.getRange(lastRow, 1, 1, sheet.getLastColumn()).setValue('').setHorizontalAlignment('center')
+        .offset(0, 0, 1, 2).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
+        .offset(0, 3, 1, 2).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
+        .offset(0, 3, 1, 3).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
+        .offset(0, 4, 1, 4).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK);
 
     if (col !== 12) // POs
     {
@@ -1049,9 +1058,9 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
       if (numPos > 0)
         poNumbersRange.clearContent() // Necessary for making sure the po number at the bottom is not duplicated
           .offset(0, 0, numPos, 1).setValues(poNumbers)  // Shift the po numbers up 1
-          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2, 1, 1).setValue(deletedDocumentNumber)
+          .offset((rowOffSet !== -1) ? rowOffSet : numRows, 2, 1, 1).setValue(deletedDocumentNumber)
       else
-        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2, 1, 1).setValue(deletedDocumentNumber)
+        range.offset((rowOffSet !== -1) ? rowOffSet : numRows, 2, 1, 1).setValue(deletedDocumentNumber)
       
       spreadsheet.toast('Added to bottom of Non-Lodge PO #s', deletedDocumentNumber)
     }
@@ -1064,9 +1073,9 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
       if (numReceipts > 0)
         poAndReceiptNumbersRange.clearContent() // Necessary for making sure the receipt number at the bottom is not duplicated
           .offset(0, 0, poAndReceiptNumbers.length, 2).setValues(poAndReceiptNumbers) // Shift the po and receipt numbers up 1
-          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(rctNum => isBlank(rctNum[0])), 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
+          .offset((rowOffSet !== -1) ? rowOffSet : numRows, 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
       else
-        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(rctNum => isBlank(rctNum[0])), 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
+        range.offset((rowOffSet !== -1) ? rowOffSet : numRows, 2, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
       
       spreadsheet.toast('Added to bottom of Non-Lodge Rct #s', deletedDocumentNumber)
     }
