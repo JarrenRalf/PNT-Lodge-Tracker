@@ -145,6 +145,88 @@ function installedOnOpen(e)
 }
 
 /**
+ * 
+ */
+function sendAnEmailToSelectedPeopleAskingIfOrderIsApproved()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const activeSheet = spreadsheet.getActiveSheet();
+  const sheetName = activeSheet.getSheetName();
+  const numCols = activeSheet.getLastColumn();
+  const emails = {   'Brent': 'brent@pacificnetandtwine.com', 
+                   'Derrick': 'dmizuyabu@pacificnetandtwine.com',
+                     'Deryk': 'deryk@pacificnetandtwine.com',
+                    'Jarren': 'jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com',
+                      'Kris': 'kris@pacificnetandtwine.com',
+                      'Nate': '',
+                      'Noah': '',
+                  'Scarlett': '',
+                     'Scott': 'scottnakashima@hotmail.com',
+                     'Endis': 'triteswarehouse@pacificnetandtwine.com',
+                      'Eryn': 'eryn@pacificnetandtwine.com'}
+  var idx = -1, emailRecipients = [], emailBodies = [];
+
+  if (sheetName === 'LODGE ORDERS' || sheetName === 'GUIDE ORDERS')
+  {
+    spreadsheet.getActiveRangeList().getRanges().map(rng => {
+      rng.offset(0, 1 - rng.getColumn(), rng.getNumRows(), numCols).getValues().map(order => {
+        if (order[3])  // If this order is already approved, then ignore it
+          return null;
+        else
+        {
+          if (emailRecipients.includes(order[1])) // If there is more than 1 order for a particular employee to determine the approval status of
+          {
+            idx = emailRecipients.indexOf(order[1])
+            emailBodies[idx].push(order);
+          }
+          else
+          {
+            idx = emailRecipients.push(order[1]) - 1;
+            emailBodies[idx] = [order];
+          }
+        }
+      })
+    })
+  }
+
+  var htmlOutput;
+  
+  emailRecipients.map((recipient, r) => {
+
+    htmlOutput = HtmlService.createHtmlOutputFromFile('getApprovalStatusEmail');
+
+    for (var i = 0; i < emailBodies[r].length; i++)
+      htmlOutput.append(
+        '<tr style="height: 20px">'+
+        '<td class="s4" dir="ltr" style="background-color:' + backgroundColours[i][0] + '">' + 
+          Utilities.formatDate(emailBodies[r][i][0], timeZone, "dd MMM yyyy") + '</td>' +
+        '<td class="s5" dir="ltr">' + emailBodies[r][i][ 1] + '</td>'+
+        '<td class="s5" dir="ltr">' + emailBodies[r][i][ 2] + '</td>'+
+        '<td class="s6" dir="ltr">' + emailBodies[r][i][ 3] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 4] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 5] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 6] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 7] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 8] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 9] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][10] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][11] + '</td>'+
+        '<td class="s7" dir="ltr">' + emailBodies[r][i][12] + '</td>'+
+        '<td class="s8" dir="ltr">' + emailBodies[r][i][13] + '</td></tr>'
+      )
+
+    htmlOutput.append('</tbody></table></div>')
+
+    MailApp.sendEmail({
+      to: emails[recipient],
+      cc: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
+      replyTo: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
+      subject: "Are the following orders APPROVED?",
+      htmlBody: htmlOutput.getContent(),
+  })})
+}
+
+/**
  * This function allows the user to add items from the I/O or B/O page to the relevant transfer page.
  * 
  * @author Jarren Ralf
@@ -967,9 +1049,9 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
       if (numPos > 0)
         poNumbersRange.clearContent() // Necessary for making sure the po number at the bottom is not duplicated
           .offset(0, 0, numPos, 1).setValues(poNumbers)  // Shift the po numbers up 1
-          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+          .offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2, 1, 1).setValue(deletedDocumentNumber)
       else
-        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2).setValue(deletedDocumentNumber)
+        range.offset(sheet.getSheetValues(row, col + 2, numRows, 1).findIndex(poNum => isBlank(poNum[0])), 2, 1, 1).setValue(deletedDocumentNumber)
       
       spreadsheet.toast('Added to bottom of Non-Lodge PO #s', deletedDocumentNumber)
     }
@@ -1313,6 +1395,7 @@ function triggers_CreateAll()
   ScriptApp.newTrigger('onChange').forSpreadsheet(spreadsheet). onChange().create();
   ScriptApp.newTrigger('installedOnOpen').forSpreadsheet(spreadsheet).onOpen().create();
   ScriptApp.newTrigger('setColumnWidths').timeBased().atHour(7).everyDays(1).create();
+  ScriptApp.newTrigger('updatedPntReceivingSpreadsheet').timeBased().atHour(20).everyDays(1).create(); 
   ScriptApp.newTrigger('updatePriceAndCostOfLeadAndFrozenBait').timeBased().atHour(7).everyDays(1).create();
   ScriptApp.newTrigger('emailCostChangeOfLeadOrFrozenBait').timeBased().atHour(15).everyDays(1).create();
   spreadsheet.getSheetByName('Triggers').getRange(1, 1).check();
@@ -1507,7 +1590,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   const lodgeOrders = (numLodgeOrders > 0) ? lodgeOrdersSheet.getSheetValues(3, 3, numLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
   const charterGuideOrders = (numCharterGuideOrders > 0) ? charterGuideOrdersSheet.getSheetValues(3, 3, numCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
-  const lodgeCompleted = (numCompletedLodgeOrders > 0) ? lodgeCompletedSheet.getSheetValues(3, 12, numCompletedLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
+  const lodgeCompleted = (numCompletedLodgeOrders > 0) ? lodgeCompletedSheet.getSheetValues(3, 11, numCompletedLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
   const charterGuideCompleted = (numCompletedCharterGuideOrders > 0) ? charterGuideCompletedSheet.getSheetValues(3, 12, numCompletedCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
 
   const currentYear = new Date().getFullYear().toString()
@@ -1805,6 +1888,108 @@ function updatePoItemsOnTracker(items, spreadsheet)
 }
 
 /**
+ * This function will be run on a trigger daily and it will update the PNT Receiving spreadsheet with the relevant data that it finds on this spreadsheet.
+ * 
+ * @author Jarren Ralf
+ */
+function updatedPntReceivingSpreadsheet()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const poItemsSheet = spreadsheet.getSheetByName('P/O') 
+  const recdItemsSheet = spreadsheet.getSheetByName("Rec'd")
+  const numCols_PoSheet = poItemsSheet.getLastColumn();
+  const numCols_RecdSheet = recdItemsSheet.getLastColumn();
+  const header_PoSheet = poItemsSheet.getSheetValues(2, 1, 1, numCols_PoSheet)[0];
+  const header_RecdSheet = recdItemsSheet.getSheetValues(2, 1, 1, numCols_RecdSheet)[0];
+  const orderDateIdx_PoSheet = header_PoSheet.indexOf('Order Date')
+  const    vendorIdx_PoSheet = header_PoSheet.indexOf('Vendor')
+  const  poNumberIdx_PoSheet = header_PoSheet.indexOf('Purchase Order #')
+  const    receiptDateIdx_RecdSheet = header_RecdSheet.indexOf('Receipt Date')
+  const         vendorIdx_RecdSheet = header_RecdSheet.indexOf('Vendor')
+  const       poNumberIdx_RecdSheet = header_RecdSheet.indexOf('Purchase Order #')
+  const  receiptNumberIdx_RecdSheet = header_RecdSheet.indexOf('Receipt #')
+  const tritesPackingSlipsSheet = SpreadsheetApp.openById('1qzyTAmtVIfOCxuhv0KzBkHpnWXFqE79DpnJSAqnZyvk').getSheetByName('Trites Packing slips')
+  const lastRow = tritesPackingSlipsSheet.getLastRow();
+  const numRows = lastRow - 2;
+  const tritesPackingSlips_ReceiptNumbers = tritesPackingSlipsSheet.getSheetValues(3, 4, numRows, 1).flat()
+  const tritesPackingSlips_PoNumbersNotReceived = tritesPackingSlipsSheet.getSheetValues(3, 3, numRows, 2)
+    .filter(poNum => !isBlank(poNum[0]) && isBlank(poNum[1])).map(poNum => poNum[0]) // PO number is not blank while the receipt number is blank
+
+  const posAndReceipts = poItemsSheet.getSheetValues(3, 1, poItemsSheet.getLastRow() - 2, numCols_PoSheet)                   // All PO items
+      .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
+      .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+    .concat(recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
+      .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
+      .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
+    ).filter(rctNum => 
+      !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) ||                                                   // Remove receipts that are already on the list
+      (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2])) // Remove pos that are already on the list
+  )
+
+  const numNewPosAndReceipts = posAndReceipts.length;
+
+  if (numNewPosAndReceipts > 0)
+    tritesPackingSlipsSheet.getRange(lastRow + 1, 1, numNewPosAndReceipts, 7).setValues(posAndReceipts).offset(-1*numRows - 1, 0, numRows + numNewPosAndReceipts + 1, 7).sort([{column: 1, ascending: false}]);
+}
+
+/**
+ * This function handles the import of the list of receipts into the spreadsheet.
+ * 
+ * @param {String[][]} allReceipts : All of the current receipts from Adagio.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf
+ */
+function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
+{
+  allReceipts.pop(); // Remove the "Total" or final line
+
+  // Get all the indexes of the relevant headers
+  const headerOE = allReceipts.shift();
+  const numReceipts = allReceipts.length;
+  const orderDateIdx = headerOE.indexOf('Order Date');
+  const poNumberIdx = headerOE.indexOf('Original Doc');
+  const receiptNumberIdx = headerOE.indexOf('Document');
+  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
+  const itemManagement_NumRows = itemManagementSheet.getLastRow() - 1;
+  const itemManagement_Receipt = itemManagementSheet.getSheetValues(2, 12, itemManagement_NumRows, 1).filter(u => !isBlank(u[0])).flat();
+  const itemManagement_NonLodgeReceipt = itemManagementSheet.getSheetValues(2, 14, itemManagement_NumRows, 1).filter(v => !isBlank(v[0])).flat();
+  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagement_NumRows, 2).filter(u => !isBlank(u[1]))
+  const currentYear = new Date().getFullYear().toString();
+  const lastYear = new Date().getFullYear().toString();
+  const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  var numReceiptsAdded = 0;
+
+  if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
+    var includeLastYearsFinalQuarterOrders = true;
+
+  if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
+    var isCurrentLodgeSeasonYear = true;
+
+  for (var i = 0; i < numReceipts; i++)
+  {
+    // Make sure the Receipt is for this year
+    if (((includeLastYearsFinalQuarterOrders && allReceipts[i][orderDateIdx].toString().substring(6) === lastYear &&
+      (allReceipts[i][orderDateIdx].toString().substring(0, 2) === '09' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '10' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '11' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '12')) 
+      || (isCurrentLodgeSeasonYear && allReceipts[i][orderDateIdx].toString().substring(6) === currentYear)))
+    {
+      if (!itemManagement_Receipt.includes(allReceipts[i][receiptNumberIdx]) && !itemManagement_NonLodgeReceipt.includes(allReceipts[i][receiptNumberIdx])) // This PO is not in either item managment PO list
+      {
+        itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
+        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx])
+        numReceiptsAdded++;
+      }
+    }
+  }
+
+  if (numReceiptsAdded > 0)
+    itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos.sort((a, b) => (a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0)).activate()
+
+  Logger.log('numReceiptsAdded: ' + numReceiptsAdded)
+
+  spreadsheet.toast(numReceiptsAdded + ' Added ', 'Receipts Imported', 60)
+}
+
+/**
  * Update the discount structure and cost for lead and bait on this spreadsheet.
  * 
  * @author Jarren Ralf
@@ -1948,13 +2133,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const headerOE = allPurchaseOrders.shift();
   const numPOs = allPurchaseOrders.length;
   const dateIdx = headerOE.indexOf('Order Date');
-  const shipToLocationIdx = headerOE.indexOf('Shipto');
   const poNumberIdx = headerOE.indexOf('Document');
-  const vendorNumberIdx = headerOE.indexOf('Vendor');
-  const vendorNameIdx = headerOE.indexOf('Vend Name');
-  const poReferenceIdx = headerOE.indexOf('Reference');
-  const poDescriptionIdx = headerOE.indexOf('Description');
-  const poTotalValueIdx = headerOE.indexOf('Total Value');
   const poStatusIdx = headerOE.indexOf('Automatic Style Code');
   const poItemsSheet = spreadsheet.getSheetByName('P/O')
   const numItemsOnPos = poItemsSheet.getLastRow() - 2;
@@ -2044,70 +2223,6 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 
   itemManagementSheet.getRange('G2').activate();
   spreadsheet.toast(numPOsAdded + ' Added ' + numPOsRemoved + ' Removed   ' + numPoItemsRemoved + ' Items Removed from P/O sheet', 'POs Imported', 60)
-}
-
-/**
- * This function handles the import of the list of receipts into the spreadsheet.
- * 
- * @param {String[][]} allReceipts : All of the current receipts from Adagio.
- * @param {Spreadsheet} spreadsheet : The active spreadsheet.
- * @author Jarren Ralf
- */
-function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
-{
-  allReceipts.pop(); // Remove the "Total" or final line
-
-  // Get all the indexes of the relevant headers
-  const headerOE = allReceipts.shift();
-  const numReceipts = allReceipts.length;
-  const orderDateIdx = headerOE.indexOf('Order Date');
-  const shipToLocationIdx = headerOE.indexOf('Shipto');
-  const poNumberIdx = headerOE.indexOf('Original Doc');
-  const receiptNumberIdx = headerOE.indexOf('Document');
-  const receiptDateIdx = headerOE.indexOf('Receipt Date');
-  const vendorNumberIdx = headerOE.indexOf('Vendor');
-  const vendorNameIdx = headerOE.indexOf('Vend Name');
-  const receiptReferenceIdx = headerOE.indexOf('Reference');
-  const receiptDescriptionIdx = headerOE.indexOf('Description');
-  const receiptTotalValueIdx = headerOE.indexOf('Total Value');
-  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
-  const itemManagement_NumRows = itemManagementSheet.getLastRow() - 1;
-  const itemManagement_Receipt = itemManagementSheet.getSheetValues(2, 12, itemManagement_NumRows, 1).filter(u => !isBlank(u[0])).flat();
-  const itemManagement_NonLodgeReceipt = itemManagementSheet.getSheetValues(2, 14, itemManagement_NumRows, 1).filter(v => !isBlank(v[0])).flat();
-  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagement_NumRows, 2).filter(u => !isBlank(u[1]))
-  const currentYear = new Date().getFullYear().toString();
-  const lastYear = new Date().getFullYear().toString();
-  const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
-  var numReceiptsAdded = 0;
-
-  if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
-    var includeLastYearsFinalQuarterOrders = true;
-
-  if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
-    var isCurrentLodgeSeasonYear = true;
-
-  for (var i = 0; i < numReceipts; i++)
-  {
-    // Make sure the Receipt is for this year
-    if (((includeLastYearsFinalQuarterOrders && allReceipts[i][orderDateIdx].toString().substring(6) === lastYear &&
-      (allReceipts[i][orderDateIdx].toString().substring(0, 2) === '09' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '10' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '11' || allReceipts[i][orderDateIdx].toString().substring(0, 2) === '12')) 
-      || (isCurrentLodgeSeasonYear && allReceipts[i][orderDateIdx].toString().substring(6) === currentYear)))
-    {
-      if (!itemManagement_Receipt.includes(allReceipts[i][receiptNumberIdx]) && !itemManagement_NonLodgeReceipt.includes(allReceipts[i][receiptNumberIdx])) // This PO is not in either item managment PO list
-      {
-        itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
-        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx])
-        numReceiptsAdded++;
-      }
-    }
-  }
-
-  if (numReceiptsAdded > 0)
-    itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos.sort((a, b) => (a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0)).activate()
-
-  Logger.log('numReceiptsAdded: ' + numReceiptsAdded)
-
-  spreadsheet.toast(numReceiptsAdded + ' Added ', 'Receipts Imported', 60)
 }
 
 /**
