@@ -581,7 +581,7 @@ function addOrdersToTransferSheet()
       var rng, richText_Notes, fullText, fullTextLength, richText_Notes_Runs, numRuns = 0;
 
       numRows.map((nRows, r) => {
-        rng = activeSheet.getRange(firstRows[r], 11, nRows, 1);
+        rng = activeSheet.getRange(firstRows[r], 10, nRows, 1);
         richText_Notes = rng.getRichTextValues().map(note_RichText => {
           fullText = note_RichText[0].getText()
           fullTextLength = fullText.length;
