@@ -1075,7 +1075,7 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
           .offset(0, 0, poAndReceiptNumbers.length, 2).setValues(poAndReceiptNumbers) // Shift the po and receipt numbers up 1
           .offset((rowOffSet !== -1) ? rowOffSet : numRows, 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
       else
-        range.offset((rowOffSet !== -1) ? rowOffSet : numRows, 2, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
+        range.offset(0, -1).clearContent().offset((rowOffSet !== -1) ? rowOffSet : numRows, 3, 1, 1).setValue(deletedDocumentNumber) // Place the deleted document number at the bottom of the list
       
       spreadsheet.toast('Added to bottom of Non-Lodge Rct #s', deletedDocumentNumber)
     }
@@ -1328,6 +1328,10 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
   const ioSheetId = ioSheet.getSheetId()
   const boSheet_LastRow = boSheet.getLastRow()
   const ioSheet_LastRow = ioSheet.getLastRow()
+  boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  SpreadsheetApp.flush();
+
   const orderNumbers_BO = (boSheet_LastRow > 2) ? boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1) : null;
   const orderNumbers_IO = (ioSheet_LastRow > 2) ? ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1) : null;
 
@@ -1388,8 +1392,6 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
     orderNumbersRange_Guide.setRichTextValues(orderNumbers_Guide);
   }
 
-  boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter(); // Create a filter in the header
-  ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter(); // Create a filter in the header
   spreadsheet.toast('Order # hyperlinks completed.', '')
 }
 
