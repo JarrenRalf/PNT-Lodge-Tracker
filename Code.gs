@@ -247,7 +247,7 @@ function addItemsToTransferSheet()
        sku.push(...values.map(v => v[3]))
        qty.push(...values.map(v => v[2]))
       name.push(...values.map(v => v[0]))
-    ordNum.push(...values.map(v => v[8])) ////// Fix this????????????????????????????????????????????????????????????
+    ordNum.push(...values.map(v => v[8])) 
   }
 
   var firstRow = Math.min(...firstRows); // This is the smallest starting row number out of all active ranges
@@ -369,9 +369,29 @@ function addItemsToTransferSheet()
         activeSheet?.getFilter()?.remove(); // Remove the filter
         activeSheet.getRange(2, 1, activeSheet.getLastRow() - 2, activeSheet.getLastColumn()).createFilter(); // Create a filter in the header
         SpreadsheetApp.flush();
+        const linkToTransferSheetText = "\nShipping from " + fromLocation + " to " + toLocation;
+        const urlToTransferSheet = url + '&range=B' + row;
+        var range, richText, fullText, fullTextLength, richText_Runs, numRuns;
 
-        const linkToTransferSheet = SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(url + '&range=B' + row).build()
-        activeRanges.map(rng => rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1).setRichTextValues(new Array(rng.getNumRows()).fill([linkToTransferSheet])));
+        activeRanges.map(rng => {
+          range = rng.offset(0, 12 - rng.getColumn(), rng.getNumRows(), 1);
+          richText = range.getRichTextValues().map(richTextVals => {
+            fullText = richTextVals[0].getText();
+            fullTextLength = fullText.length;
+            richText_Runs = richTextVals[0].getRuns().map(run => [run.getStartIndex(), run.getEndIndex(), run.getTextStyle()]);
+            numRuns = richText_Runs.length
+
+            if (isNotBlank(fullText))
+              for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + linkToTransferSheetText); i < numRuns; i++)
+                richTextBuilder.setTextStyle(richText_Runs[i][0], richText_Runs[i][1], richText_Runs[i][2]);
+            else
+              return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(urlToTransferSheet).build()];
+
+            return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + linkToTransferSheetText.length, urlToTransferSheet).build()];
+          })
+          
+          range.setRichTextValues(richText).setBackgrounds(range.getBackgrounds());
+        });
 
         spreadsheet.toast('Click on the link and and make the necessary changes to the Transfer sheet', 'Item(s) Added to Transfer Sheet', -1)
       }
@@ -1009,6 +1029,18 @@ function isBlank(str)
 }
 
 /**
+ * This function checks if a given value is precisely a non-blank string.
+ * 
+ * @param  {String}  str : A given string.
+ * @return {Boolean} Returns a boolean based on whether an inputted string is not-blank or not.
+ * @author Jarren Ralf
+ */
+function isNotBlank(str)
+{
+  return str !== '';
+}
+
+/**
 * This function checks if the given input is a number or not.
 *
 * @param {Object} num The inputted argument, assumed to be a number.
@@ -1198,7 +1230,7 @@ function moveRow(e, sheet, spreadsheet)
         }
         else if (col == 5) // Adding a Printed By name
         {
-          if (range.getValue() !== '')
+          if (isNotBlank(range.getValue()))
           {
             if (!range.offset(0, -1).isChecked())
             {
@@ -1715,7 +1747,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       const completedLodgeOrderNumbers = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 12)
         .filter(ord => ord[11] === 'Completed')
         .map(ord => ord[0]).flat()
-        .filter(ordNum => ordNum !== ''); 
+        .filter(ordNum => isNotBlank(ordNum)); 
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
@@ -1742,7 +1774,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       const completedCharterGuideOrderNumbers = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 12)
         .filter(ord => ord[11] === 'Completed')
         .map(ord => ord[2]).flat()
-        .filter(ordNum => ordNum !== '');
+        .filter(ordNum => isNotBlank(ordNum));
 
       Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14)
@@ -1768,7 +1800,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   {
     var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [], today = new Date();
     SpreadsheetApp.flush();
-    const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => ordNum !== ''); 
+    const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => isNotBlank(ordNum)); 
     const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
       .filter(currentOrd => {
 
