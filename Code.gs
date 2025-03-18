@@ -151,35 +151,46 @@ function sendAnEmailToSelectedPeopleAskingIfOrderIsApproved()
 {
   const spreadsheet = SpreadsheetApp.getActive();
   const activeSheet = spreadsheet.getActiveSheet();
-  const sheetName = activeSheet.getSheetName();
+  const sheetName = activeSheet.getSheetName().split(" ");
   const numCols = activeSheet.getLastColumn();
-  const emails = {   'Brent': 'brent@pacificnetandtwine.com', 
-                   'Derrick': 'dmizuyabu@pacificnetandtwine.com',
-                     'Deryk': 'deryk@pacificnetandtwine.com',
-                    'Jarren': 'jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com',
-                      'Kris': 'kris@pacificnetandtwine.com',
+  // const emails = {   'Brent': 'brent@pacificnetandtwine.com', 
+  //                  'Derrick': 'dmizuyabu@pacificnetandtwine.com',
+  //                    'Deryk': 'deryk@pacificnetandtwine.com',
+  //                   'Jarren': 'jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com',
+  //                     'Kris': 'kris@pacificnetandtwine.com',
+  //                     'Nate': '',
+  //                     'Noah': '',
+  //                 'Scarlett': '',
+  //                    'Scott': 'scottnakashima@hotmail.com',
+  //                    'Endis': 'triteswarehouse@pacificnetandtwine.com',
+  //                     'Eryn': 'eryn@pacificnetandtwine.com'}
+  const emails = {   'Brent': 'lb_blitz_allstar@hotmail.com', 
+                   'Derrick': 'lb_blitz_allstar@hotmail.com',
+                     'Deryk': 'lb_blitz_allstar@hotmail.com',
+                    'Jarren': 'lb_blitz_allstar@hotmail.com',
+                      'Kris': 'lb_blitz_allstar@hotmail.com',
                       'Nate': '',
                       'Noah': '',
                   'Scarlett': '',
-                     'Scott': 'scottnakashima@hotmail.com',
-                     'Endis': 'triteswarehouse@pacificnetandtwine.com',
-                      'Eryn': 'eryn@pacificnetandtwine.com'}
+                     'Scott': 'lb_blitz_allstar@hotmail.com',
+                     'Endis': 'lb_blitz_allstar@hotmail.com',
+                      'Eryn': 'lb_blitz_allstar@hotmail.com'}
   var idx = -1, emailRecipients = [], emailBodies = [];
 
-  if (sheetName === 'LODGE ORDERS' || sheetName === 'GUIDE ORDERS')
+  if (sheetName.pop() === 'ORDERS')
   {
     spreadsheet.getActiveRangeList().getRanges().map(rng => {
       rng.offset(0, 1 - rng.getColumn(), rng.getNumRows(), numCols).getValues().map(order => {
-        if (order[3])  // If this order is already approved, then ignore it
+        if (order[3]) // If this order is already approved, then ignore it
           return null;
-        else
+        else // Order is not approved
         {
           if (emailRecipients.includes(order[1])) // If there is more than 1 order for a particular employee to determine the approval status of
           {
             idx = emailRecipients.indexOf(order[1])
             emailBodies[idx].push(order);
           }
-          else
+          else // This is the first instance of an employee who has an unapproved order
           {
             idx = emailRecipients.push(order[1]) - 1;
             emailBodies[idx] = [order];
@@ -187,43 +198,41 @@ function sendAnEmailToSelectedPeopleAskingIfOrderIsApproved()
         }
       })
     })
-  }
 
-  var htmlOutput;
+    var htmlTemplate, htmlOutput;
   
-  emailRecipients.map((recipient, r) => {
+    emailRecipients.map((recipient, r) => {
 
-    htmlOutput = HtmlService.createHtmlOutputFromFile('getApprovalStatusEmail');
+      htmlTemplate = HtmlService.createTemplateFromFile('getApprovalStatusEmail')
+      htmlTemplate.customerType = toProper(sheetName.pop())
+      htmlOutput = htmlTemplate.evaluate();
 
-    for (var i = 0; i < emailBodies[r].length; i++)
-      htmlOutput.append(
-        '<tr style="height: 20px">'+
-        '<td class="s4" dir="ltr" style="background-color:' + backgroundColours[i][0] + '">' + 
-          Utilities.formatDate(emailBodies[r][i][0], timeZone, "dd MMM yyyy") + '</td>' +
-        '<td class="s5" dir="ltr">' + emailBodies[r][i][ 1] + '</td>'+
-        '<td class="s5" dir="ltr">' + emailBodies[r][i][ 2] + '</td>'+
-        '<td class="s6" dir="ltr">' + emailBodies[r][i][ 3] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 4] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 5] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 6] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 7] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 8] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][ 9] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][10] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][11] + '</td>'+
-        '<td class="s7" dir="ltr">' + emailBodies[r][i][12] + '</td>'+
-        '<td class="s8" dir="ltr">' + emailBodies[r][i][13] + '</td></tr>'
-      )
+      for (var i = 0; i < emailBodies[r].length; i++)
+        htmlOutput.append(
+          '<tr style="height: 20px">'+
+          '<td class="s5" dir="ltr" style="background-color:' + backgroundColours[i][0] + '">' + 
+            Utilities.formatDate(emailBodies[r][i][0], timeZone, "dd MMM yyyy") + '</td>' +
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][1] + '</td>'+
+          '<td class="s7" dir="ltr">' + emailBodies[r][i][2] + '</td>'+
+          '<td class="s8" dir="ltr">' + emailBodies[r][i][3] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][4] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][5] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][6] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][7] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][8] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][9] + '</td></tr>'
+        )
 
-    htmlOutput.append('</tbody></table></div>')
+      htmlOutput.append('</tbody></table></div>')
 
-    MailApp.sendEmail({
-      to: emails[recipient],
-      cc: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
-      replyTo: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
-      subject: "Are the following orders APPROVED?",
-      htmlBody: htmlOutput.getContent(),
-  })})
+      MailApp.sendEmail({
+        to: emails[recipient],
+        //cc: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
+        replyTo: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
+        subject: "Are the following orders APPROVED?",
+        htmlBody: htmlOutput.getContent(),
+    })})
+  }
 }
 
 /**
@@ -653,6 +662,49 @@ function applyFullRowFormatting(sheet, row, numRows, isItemsToRichmondPage)
 }
 
 /**
+ * This function takes the given string, splits it at the chosen delimiter, and capitalizes the first letter of each perceived word.
+ * 
+ * @param {String} str : The given string
+ * @param {String} delimiter : The delimiter that determines where to split the given string
+ * @return {String} The output string with proper case
+ * @author Jarren Ralf
+ */
+function capitalizeSubstrings(str, delimiter)
+{
+  var numLetters;
+  var words = str.toString().split(delimiter); // Split the string at the chosen location/s based on the delimiter
+
+  for (var word = 0, string = ''; word < words.length; word++) // Loop through all of the words in order to build the new string
+  {
+    numLetters = words[word].length;
+
+    if (numLetters == 0) // The "word" is a blank string (a sentence contained 2 spaces)
+      continue; // Skip this iterate
+    else if (numLetters == 1) // Single character word
+    {
+      if (words[word][0] !== words[word][0].toUpperCase()) // If the single letter is not capitalized
+        words[word] = words[word][0].toUpperCase(); // Then capitalize it
+    }
+    else if (numLetters == 2 && words[word].toUpperCase() === 'PO') // So that PO Box is displayed correctly
+      words[word] = words[word].toUpperCase();
+    else
+    {
+      /* If the first letter is not upper case or the second letter is not lower case, then
+       * capitalize the first letter and make the rest of the word lower case.
+       */
+      if (words[word][0] !== words[word][0].toUpperCase() || words[word][1] !== words[word][1].toLowerCase())
+        words[word] = words[word][0].toUpperCase() + words[word].substring(1).toLowerCase();
+    }
+
+    string += words[word] + delimiter; // Add a blank space at the end
+  }
+
+  string = string.slice(0, -1); // Remove the last space
+
+  return string;
+}
+
+/**
  * This function creates a new Lodge Tracker for the next season.
  * 
  * @author Jarren Ralf
@@ -782,7 +834,8 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
   }  
 
   SpreadsheetApp.flush()
-
+  boSheet?.getFilter()?.remove(); // Remove the filter
+  ioSheet?.getFilter()?.remove();
   const boSheet_NumRows_Updated = boSheet.getLastRow() - 1;
   const ioSheet_NumRows_Updated = ioSheet.getLastRow() - 1;
 
@@ -1436,6 +1489,19 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
   }
 
   spreadsheet.toast('Order # hyperlinks completed.', '')
+}
+
+/**
+ * This function takes the given string and makes sure that each word in the string has a capitalized 
+ * first letter followed by lower case.
+ * 
+ * @param {String} str : The given string
+ * @return {String} The output string with proper case
+ * @author Jarren Ralf
+ */
+function toProper(str)
+{
+  return capitalizeSubstrings(capitalizeSubstrings(str, '-'), ' ');
 }
 
 /**
