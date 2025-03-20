@@ -472,7 +472,7 @@ function addOrdersToTransferSheet()
     firstRows.push(activeRange.getRow())
      lastRows.push(activeRange.getLastRow())
       numRows.push(lastRows[r] - firstRows[r] + 1)
-       values.push(...activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 10))
+       values.push(...activeSheet.getSheetValues(firstRows[r], 3, numRows[r], 9))
   })
 
   if (Math.min(...firstRows) < 3)
@@ -540,7 +540,7 @@ function addOrdersToTransferSheet()
             url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
             itemValues = values.map(value => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Jesse (Lodge Order)']) 
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[8]) || value[8] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[8]), 'ATTN: Jesse (Lodge Order)']) 
             row = sheet.getLastRow() + 1;
             numOrders = itemValues.length;
             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
@@ -550,7 +550,7 @@ function addOrdersToTransferSheet()
             url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=407280159#gid=407280159'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
             itemValues = values.map(value => 
-              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Doug (Lodge Order)'])
+              [today, 'Lodge\nTracker', '', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[8]) || value[8] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[8]), 'ATTN: Doug (Lodge Order)'])
             row = sheet.getLastRow() + 1;
             numOrders = itemValues.length;
             sheet.getRange(row, 1, numOrders, 6).setNumberFormat('@').setValues(itemValues)
@@ -562,7 +562,7 @@ function addOrdersToTransferSheet()
         url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=269292771#gid=269292771'
         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
         itemValues = values.map(value => 
-          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Order)']
+          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[8]) || value[8] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[8]), 'ATTN: Scott (Lodge Order)']
         ) 
         row = sheet.getLastRow() + 1;
         numOrders = itemValues.length;
@@ -573,7 +573,7 @@ function addOrdersToTransferSheet()
         url = 'https://docs.google.com/spreadsheets/d/1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c/edit?gid=1569594370#gid=1569594370'
         sheet = SpreadsheetApp.openByUrl(url).getSheetByName('ItemsToRichmond')
         itemValues = values.map(value => 
-          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[9]) || value[9] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[9]), 'ATTN: Scott (Lodge Items)']
+          [today, 'Lodge\nTracker', '', 'Order# ' + value[0] + ' for ' + value[3] + ' - ' + ((isBlank(value[8]) || value[8] === 'multiple') ? 'NOT INVOICED' : 'Inv# ' + value[8]), 'ATTN: Scott (Lodge Items)']
         ) 
         row = sheet.getLastRow() + 1;
         numOrders = itemValues.length;
