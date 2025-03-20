@@ -1684,9 +1684,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const employeeNameIdx = headerOE.indexOf('Created by User');
   const isOrderCompleteIdx = headerOE.indexOf('Order Complete?');
   const invoiceDateIdx = (headerOE.indexOf('Inv Date') !== -1) ? headerOE.indexOf('Inv Date') : headerOE.indexOf('OE Invoice Date');
-  Logger.log("headerOE.indexOf('Inv Date'): " + headerOE.indexOf('Inv Date'))
-  Logger.log("headerOE.indexOf('OE Invoice Date'): " + headerOE.indexOf('OE Invoice Date'))
-  Logger.log('invoiceDateIdx: ' + invoiceDateIdx)
   const invoicedByIdx = headerOE.indexOf('OE Invoice Initials');
   const creditNumIdx = headerOE.indexOf('Credit');
   const creditedByIdx = headerOE.indexOf('OE Credit Note Initials');
@@ -1782,50 +1779,60 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   if (numNewLodgeOrder > 0)
   {
-    var numCols = newLodgeOrders[0].length;
+    var numCols_Lodge = newLodgeOrders[0].length;
 
     if (isInvoicedOrders)
     {
       var lodgePartiallyCompleteOrders = newLodgeOrders.map(ord => [ord[2], ord.pop()])
+      numCols_Lodge--; // The "Order Complete?" staus is removed from the end of the array
 
-      lodgeCompletedSheet.activate().getRange(numCompletedLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
+      lodgeCompletedSheet.activate().getRange(numCompletedLodgeOrders + 3, 1, numNewLodgeOrder, numCols_Lodge)
           .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newLodgeOrders)
-        .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 15, ascending: true}, {column: 1, ascending: true}]);
+        .offset(-1*numCompletedLodgeOrders, 0, numCompletedLodgeOrders + numNewLodgeOrder, numCols_Lodge)
+          .sort([{column: 15, ascending: true}, {column: 11, ascending: true}, {column: 1, ascending: true}]);
     }
     else
-      lodgeOrdersSheet.activate().getRange(numLodgeOrders + 3, 1, numNewLodgeOrder, numCols)
+      lodgeOrdersSheet.activate().getRange(numLodgeOrders + 3, 1, numNewLodgeOrder, numCols_Lodge)
           .setNumberFormats(new Array(numNewLodgeOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@']))
           .setFontColor('black').setFontLine('none').setValues(newLodgeOrders)
-        .offset(-1*numLodgeOrders, 0, numLodgeOrders + numNewLodgeOrder, numCols).sort([{column: 1, ascending: true}]);
+        .offset(-1*numLodgeOrders, 0, numLodgeOrders + numNewLodgeOrder, numCols_Lodge)
+          .sort([{column: 1, ascending: true}, {column: 3, ascending: true}]);
 
     Logger.log('The following new Lodge orders were added to the tracker:')
     Logger.log(newLodgeOrders)
 
     deleteBackOrderedItems(newLodgeOrders, spreadsheet);
   }
+  else
+    var lodgePartiallyCompleteOrders = [];
 
   if (numNewCharterGuideOrder > 0)
   {
-    var numCols = newCharterGuideOrders[0].length;
+    var numCols_CharterGuide = newCharterGuideOrders[0].length;
 
     if (isInvoicedOrders)
     {
       var charterGuidePartiallyCompleteOrders = newCharterGuideOrders.map(ord => [ord[2], ord.pop()])
+      numCols_CharterGuide--; // The "Order Complete?" staus is removed from the end of the array
       
-      charterGuideCompletedSheet.getRange(numCompletedCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols)
+      charterGuideCompletedSheet.getRange(numCompletedCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols_CharterGuide)
           .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy'])).setValues(newCharterGuideOrders)
-        .offset(-1*numCompletedCharterGuideOrders, 0, numCompletedCharterGuideOrders + numNewCharterGuideOrder, numCols).sort([{column: 15, ascending: true}, {column: 1, ascending: true}]);
+        .offset(-1*numCompletedCharterGuideOrders, 0, numCompletedCharterGuideOrders + numNewCharterGuideOrder, numCols_CharterGuide)
+          .sort([{column: 15, ascending: true}, {column: 11, ascending: true}, {column: 1, ascending: true}]);
     }
     else
-      charterGuideOrdersSheet.getRange(numCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols)
+      charterGuideOrdersSheet.getRange(numCharterGuideOrders + 3, 1, numNewCharterGuideOrder, numCols_CharterGuide)
           .setNumberFormats(new Array(numNewCharterGuideOrder).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@'])).setValues(newCharterGuideOrders)
-        .offset(-1*numCharterGuideOrders, 0, numCharterGuideOrders + numNewCharterGuideOrder, numCols).sort([{column: 1, ascending: true}]);
+        .offset(-1*numCharterGuideOrders, 0, numCharterGuideOrders + numNewCharterGuideOrder, numCols_CharterGuide)
+          .sort([{column: 1, ascending: true}, {column: 3, ascending: true}]);
 
     Logger.log('The following new Charter and Guide orders were added to the tracker:')
     Logger.log(newCharterGuideOrders)
 
     deleteBackOrderedItems(newCharterGuideOrders, spreadsheet);
   }
+  else
+    var charterGuidePartiallyCompleteOrders = []
 
   // Orders that are fully completed may need to be removed from the Lodge Orders and Guide Orders page
   if (isInvoicedOrders)
