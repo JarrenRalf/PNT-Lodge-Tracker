@@ -1731,11 +1731,14 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     return (notesContainCreditNumber.length > 1) ? notesContainCreditNumber.pop().split('\n').shift().toString() : false;
   }).filter(creditNum => creditNum) : [];
 
-  const currentYear = new Date().getFullYear().toString()
-  const lastYear = new Date().getFullYear().toString()
+  const today = new Date();
+  const currentYear = today.getFullYear().toString()
+  const lastYear = (Number(currentYear) - 1).toString()
   const lodgeSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  const todayFormattedDate = Utilities.formatDate(today, spreadsheet.getSpreadsheetTimeZone(), 'MM-dd-yyyy')
+  Logger.log(todayFormattedDate)
 
-  if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
+  if (lodgeSheetYear === (Number(currentYear) + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
 
   if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
@@ -1756,7 +1759,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
-        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString(order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Lodge Completed
+        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((isBlank(order[invoiceDateIdx].toString())) ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Lodge Completed
       })) :
     allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
@@ -1781,7 +1784,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
-        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString(order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Charter & Guide Completed
+        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((isBlank(order[invoiceDateIdx].toString())) ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Charter & Guide Completed
       })) :
     allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
@@ -1867,6 +1870,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         .map(ord => ord[0]).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order'); 
 
+      Logger.log(completedLodgeOrderNumbers)
+
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
 
@@ -1942,7 +1947,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   }
   else // Cancelled Orders (if ANY)
   {
-    var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [], today = new Date();
+    var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [];
     SpreadsheetApp.flush();
     const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => isNotBlank(ordNum)); 
     const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
