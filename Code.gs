@@ -975,6 +975,8 @@ function getFullName(initials)
         return 'Brent';
       case 'EG':
         return 'Eryn';
+      case 'SG':
+        return 'Shane';
       case 'FN':
         return 'Frank';
       case 'GN':
@@ -989,6 +991,8 @@ function getFullName(initials)
         return 'Scott';
       case 'TW':
         return 'Jarren';
+      case 'NV':
+        return 'Nathan';
       default:
         return initials;
     }
@@ -1672,7 +1676,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   var totalIdx = headerOE.indexOf('Total Dollar Value');
 
   if (totalIdx === -1)
-    totalIdx = headerOE.indexOf('Amount'); // The non history invoices are titled with Amount and not Total Dollar Value
+    totalIdx = headerOE.indexOf('Amount'); // The credit notes are titled with Amount and not Total Dollar Value
 
   const isInvoicedOrders = headerOE[totalIdx];
   const custNumIdx = headerOE.indexOf('Customer');
@@ -1689,6 +1693,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const creditedByIdx = headerOE.indexOf('OE Credit Note Initials');
   const creditDateIdx = (headerOE.indexOf('OE Credit Note Date') !== -1) ? headerOE.indexOf('OE Credit Note Date') : headerOE.indexOf('Credited');
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
+  var notesContainCreditNumber;
   
   const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
   const charterGuideCustomerSheet = spreadsheet.getSheetByName('Charter & Guide Customer List');
@@ -1712,7 +1717,19 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const lodgeOrders = (numLodgeOrders > 0) ? lodgeOrdersSheet.getSheetValues(3, 3, numLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
   const charterGuideOrders = (numCharterGuideOrders > 0) ? charterGuideOrdersSheet.getSheetValues(3, 3, numCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
   const lodgeCompleted = (numCompletedLodgeOrders > 0) ? lodgeCompletedSheet.getSheetValues(3, 11, numCompletedLodgeOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
-  const charterGuideCompleted = (numCompletedCharterGuideOrders > 0) ? charterGuideCompletedSheet.getSheetValues(3, 12, numCompletedCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
+  const charterGuideCompleted = (numCompletedCharterGuideOrders > 0) ? charterGuideCompletedSheet.getSheetValues(3, 11, numCompletedCharterGuideOrders, 1).flat().map(ordNum => ordNum.toString()) : [];
+
+  const lodgeCredited = (numCompletedLodgeOrders > 0) ? lodgeCompletedSheet.getSheetValues(3, 10, numCompletedLodgeOrders, 1).flat().map(creditNum => {
+    notesContainCreditNumber = creditNum.toString().split('Credit # ');
+
+    return (notesContainCreditNumber.length > 1) ? notesContainCreditNumber.pop().split('\n').shift().toString() : false;
+  }).filter(creditNum => creditNum) : [];
+
+  const charterGuideCredited = (numCompletedCharterGuideOrders > 0) ? charterGuideCompletedSheet.getSheetValues(3, 10, numCompletedCharterGuideOrders, 1).flat().map(creditNum => {
+    notesContainCreditNumber = creditNum.toString().split('Credit # ');
+
+    return (notesContainCreditNumber.length > 1) ? notesContainCreditNumber.pop().split('\n').shift().toString() : false;
+  }).filter(creditNum => creditNum) : [];
 
   const currentYear = new Date().getFullYear().toString()
   const lastYear = new Date().getFullYear().toString()
@@ -1731,7 +1748,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
             (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
             || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
-          && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
+          && !lodgeCredited.includes(order[creditNumIdx].toString().trim())).map(order => {
           return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx].toString(), months), 'No'] // Lodge Completed
         }) : 
       allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
@@ -1756,7 +1773,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
             (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
             || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
-          && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
+          && !charterGuideCredited.includes(order[creditNumIdx].toString().trim())).map(order => { 
           return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx].toString(), months), 'No'] // Charter & Guide Completed
         }) : 
       allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
@@ -1776,6 +1793,9 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   const numNewLodgeOrder = newLodgeOrders.length;
   const numNewCharterGuideOrder = newCharterGuideOrders.length;
+
+  Logger.log('numNewLodgeOrder: ' + numNewLodgeOrder)
+  Logger.log(newLodgeOrders)
 
   if (numNewLodgeOrder > 0)
   {
