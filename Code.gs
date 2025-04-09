@@ -1736,7 +1736,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const lastYear = (Number(currentYear) - 1).toString()
   const lodgeSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
   const todayFormattedDate = Utilities.formatDate(today, spreadsheet.getSpreadsheetTimeZone(), 'MM-dd-yyyy')
-  Logger.log(todayFormattedDate)
 
   if (lodgeSheetYear === (Number(currentYear) + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
@@ -1796,9 +1795,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   const numNewLodgeOrder = newLodgeOrders.length;
   const numNewCharterGuideOrder = newCharterGuideOrders.length;
-
-  Logger.log('numNewLodgeOrder: ' + numNewLodgeOrder)
-  Logger.log(newLodgeOrders)
 
   if (numNewLodgeOrder > 0)
   {
@@ -1870,7 +1866,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         .map(ord => ord[0]).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order'); 
 
-      Logger.log(completedLodgeOrderNumbers)
+      Logger.log('completedLodgeOrderNumbers: ' + completedLodgeOrderNumbers)
+      Logger.log('lodgePartiallyCompleteOrders: ' + lodgePartiallyCompleteOrders)
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
@@ -1887,7 +1884,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
         }).filter(currentOrd => {
 
-          isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]) && isBlank(currentOrd[10]) && isBlank(currentOrd[13]); // Invoice # and Order Status must both be blank
+          isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]); 
 
           if (isLodgeOrderComplete)
             Logger.log(currentOrd);
@@ -1927,7 +1924,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
         }).filter(currentOrd => {
 
-          isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]) && isBlank(currentOrd[10]) && isBlank(currentOrd[13]); // Invoice # and Order Status must both be blank
+          isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]); // Invoice # and Order Status must both be blank
 
           if (isCharterGuideOrderComplete)
             Logger.log(currentOrd);
