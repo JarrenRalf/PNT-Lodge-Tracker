@@ -1452,10 +1452,7 @@ function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
       {
         row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
 
-        if (row_bo > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_io + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]
-        else
-          return ordNum;
+        return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()] : ordNum;
       }
       else 
         return ordNum;
