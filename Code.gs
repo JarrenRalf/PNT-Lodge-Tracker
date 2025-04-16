@@ -27,7 +27,7 @@ function onChange(e)
           nCols,
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Created by User')        : false, // There is a sheet with no rows and no columns
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Order Complete?')        : false, // There is a sheet with no rows and no columns
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Automatic Style Code')   : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Receipt Date')           : false, 
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false,
@@ -1982,7 +1982,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     {
       const cancelledSheet = spreadsheet.getSheetByName('CANCELLED')
       cancelledSheet.getRange(cancelledSheet.getLastRow() + 1, 1, numCancelledOrders, 15)
-        .setNumberFormats(new Array(numCancelledOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', 'MMM dd, yyyy', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy']))
+        .setNumberFormats(new Array(numCancelledOrders).fill(['MMM dd, yyyy', '@', '@', '#', '@', '@', '@', '@', '@', '@', '@', '$#,##0.00', '@', '@', 'MMM dd, yyyy']))
         .setValues(cancelledOrders)
       Logger.log('The following orders were removed from the tracker and placed on the CANCELLED page because they were NOT found in OrderEntry:')
       Logger.log(cancelledOrders)
