@@ -13,7 +13,9 @@ function onChange(e)
   {
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
-    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, nRows = 0, nCols = 0;
+    var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, 
+    isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, 
+    isInvoicedItems = 10, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -32,14 +34,14 @@ function onChange(e)
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Receipt Date')           : false, 
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered')   : false, 
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false
-           
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false,
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Ordered')                : false
         ]
 
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
         if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
             ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && 
-            (info[isAdagioOE] || info[isAdagioPO] || info[isAdagioPO_Receipts] || info[isBackOrderItems] || info[isPurchaseOrderItems] || info[isReceivedItems]))) 
+            (info[isAdagioOE] || info[isAdagioPO] || info[isAdagioPO_Receipts] || info[isBackOrderItems] || info[isPurchaseOrderItems] || info[isReceivedItems] || info[isInvoicedItems]))) 
         {
           spreadsheet.toast('Processing imported data...', '', 60)
           
@@ -61,6 +63,8 @@ function onChange(e)
             updateItemsOnTracker(values, spreadsheet, fileName);
           else if (info[isPurchaseOrderItems])
             updatePoItemsOnTracker(values, spreadsheet);
+          // else if (info[isInvoicedItems])
+          //   updateInvoicedItemsOnTracker(values, spreadsheet);
           
           break;
         }
@@ -1532,6 +1536,68 @@ function triggers_DeleteAll()
 {
   ScriptApp.getProjectTriggers().map(trigger => ScriptApp.deleteTrigger(trigger));
   SpreadsheetApp.getActive().getSheetByName('Triggers').getRange(1, 1).uncheck();
+}
+
+/**
+ * This function handles the import of an Invoice (from Adagio OrderEntry) that contains items that have already been billed and presumably shipped out.
+ * 
+ * @param {String[][]}     items    : A list of items on the invoice that was imported.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @author Jarren Ralf
+ */
+function updateInvoicedItemsOnTracker(items, spreadsheet)
+{
+  ////////////////////////////////////////////////////////////////////////////////////////////////////
+  items.pop(); // Remove the "Total" or final line
+
+  // Get all the indexes of the relevant headers
+  const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
+  const headerOE = items.shift();
+  const invoiceDate = getDateString(items[0][headerOE.indexOf('Date')], months);
+  const orderedQtyIdx = headerOE.indexOf('Ordered');
+  const shippedQtyIdx = headerOE.indexOf('Shipped'); 
+  const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
+  const skuIdx = headerOE.indexOf('Item');
+  const descriptionIdx = headerOE.indexOf('Description');
+  const unitCostIdx = headerOE.indexOf('Display Price');
+  const extendedUnitCostIdx = headerOE.indexOf('Display Ext Price');
+  const locationName = getLocationName(items[0][headerOE.indexOf('Location')]);
+  
+  
+
+  
+  
+  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
+  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagementSheet.getLastRow() - 1, 2).filter(u => !isBlank(u[1]))
+
+  const purchaseOrderNumber = itemManagement_ReceiptsWithPos.find(rct => rct[1] === receiptNumber)[0];
+  const recdItemSheet = spreadsheet.getSheetByName("Rec'd").activate(); 
+  const numCurrentItems = recdItemSheet.getLastRow() - 2;
+  recdItemSheet?.getFilter()?.remove(); // Remove the filter
+
+  Logger.log('Receipt Number: ' + receiptNumber)
+
+  const newItems = items.map(item => [invoiceDate, vendorName, item[orderedQtyIdx], item[receivedQtyIdx], item[backOrderQtyIdx], 
+    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, receiptNumber])
+
+  const numNewItems = newItems.length;
+  const numCols = newItems[0].length;
+  const receiptNumCol = recdItemSheet.getLastColumn();
+
+  if (numCurrentItems > 0)
+    recdItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+        .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+      .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: receiptNumCol, ascending: true}]);
+  else
+    recdItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+
+  Logger.log("The following new received items were added to the Rec'd tab:")
+  Logger.log(newItems)
+
+  spreadsheet.toast(numNewItems + ' Added ', "Rec'd Items Imported", 60)
+
+  SpreadsheetApp.flush()
+  recdItemSheet.getRange(2, 1, recdItemSheet.getLastRow() - 1, receiptNumCol).createFilter(); // Create a filter in the header
 }
 
 /**
