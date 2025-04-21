@@ -1578,8 +1578,11 @@ function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
 
   Logger.log('Invoice Number: ' + invoiceNumber)
 
-  const newItems = items.map(item => [invoiceDate, customerName, item[orderedQtyIdx], item[shippedQtyIdx], item[backOrderQtyIdx], 
-    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], locationName , orderNumber, invoiceNumber])
+  const newItems = items.filter(shippedQty => shippedQty[shippedQtyIdx] != 0) // Remove the items that weren't shipped
+    .map(item => 
+      [invoiceDate, customerName, item[orderedQtyIdx], item[shippedQtyIdx], item[backOrderQtyIdx], 
+      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], 
+      locationName , orderNumber, invoiceNumber])
 
   const numNewItems = newItems.length;
   const numCols = newItems[0].length;
