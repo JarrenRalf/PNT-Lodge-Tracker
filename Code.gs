@@ -63,8 +63,8 @@ function onChange(e)
             updateItemsOnTracker(values, spreadsheet, fileName);
           else if (info[isPurchaseOrderItems])
             updatePoItemsOnTracker(values, spreadsheet);
-          // else if (info[isInvoicedItems])
-          //   updateInvoicedItemsOnTracker(values, spreadsheet);
+          else if (info[isInvoicedItems])
+            updateInvoicedItemsOnTracker(values, spreadsheet, fileName);
           
           break;
         }
@@ -1043,18 +1043,19 @@ function getLocationName(locationCode)
  * This function checks if the tab of the imported excel sheet contains the Adagio Order Number, if not, it prompts the user to enter it. 
  * If there are any uynexpected inputs, the order number is left blank.
  * 
- * @param {String} ordNum : The tab name of the imported excel spreadsheet (assumed to be the order number)
+ * @param {String}     ordNum    : The tab name of the imported excel spreadsheet (assumed to be the order number)
+ * @param {Boolean} isInvoiceNum : Weather the order being imported is an invoice or not.
  * @returns {String} Returns the order number if it has been determined to be correct, or blank otherwise.
  * @auther Jarren Ralf
  */
-function getOrderNumber(ordNum)
+function getOrderNumber(ordNum, isInvoiceNum)
 {
   if (isNumber(ordNum) && ordNum.toString().length === 5)
     return ordNum;
   else
   {
     const ui = SpreadsheetApp.getUi();
-    const response = ui.prompt('Enter the order number:',);
+    const response = ui.prompt((isInvoiceNum) ? 'Enter the invoice number:' : 'Enter the order number:',);
     const orderNumber = response.getResponseText().trim(); 
 
     return (response.getSelectedButton() !== ui.Button.OK) ? '' : (isNumber(orderNumber) && orderNumber.length === 5) ? orderNumber : '';
@@ -1543,61 +1544,61 @@ function triggers_DeleteAll()
  * 
  * @param {String[][]}     items    : A list of items on the invoice that was imported.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {String}        invNum    : The invoice number that is being imported.
  * @author Jarren Ralf
  */
-function updateInvoicedItemsOnTracker(items, spreadsheet)
+function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
 {
-  ////////////////////////////////////////////////////////////////////////////////////////////////////
   items.pop(); // Remove the "Total" or final line
-
-  // Get all the indexes of the relevant headers
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
+  
+  // Get all the indexes of the relevant headers
   const headerOE = items.shift();
   const invoiceDate = getDateString(items[0][headerOE.indexOf('Date')], months);
+  const customerNum = items[0][headerOE.indexOf('Cust #')];
   const orderedQtyIdx = headerOE.indexOf('Ordered');
   const shippedQtyIdx = headerOE.indexOf('Shipped'); 
   const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
   const skuIdx = headerOE.indexOf('Item');
   const descriptionIdx = headerOE.indexOf('Description');
-  const unitCostIdx = headerOE.indexOf('Display Price');
-  const extendedUnitCostIdx = headerOE.indexOf('Display Ext Price');
-  const locationName = getLocationName(items[0][headerOE.indexOf('Location')]);
+  const unitPriceIdx = headerOE.indexOf('Display Price');
+  const extendedunitPriceIdx = headerOE.indexOf('Display Ext Price');
+  const locationName = getLocationName(items[0][headerOE.indexOf('Loc')]);
   
-  
-
-  
-  
+  const invoiceNumber = getOrderNumber(invNum, true);
   const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
-  const itemManagement_ReceiptsWithPos = itemManagementSheet.getSheetValues(2, 11, itemManagementSheet.getLastRow() - 1, 2).filter(u => !isBlank(u[1]))
+  const itemManagement_InvoicesWithOrders = itemManagementSheet.getSheetValues(2, 16, itemManagementSheet.getLastRow() - 1, 2).filter(u => !isBlank(u[1]))
+  const orderNumber = itemManagement_InvoicesWithOrders.find(inv => inv[1] === invoiceNumber)[0];
+  const fullCustomerListSheet = spreadsheet.getSheetByName('Full Customer List').activate(); 
+  const possibleCustomerName = fullCustomerListSheet.getSheetValues(3, 1, fullCustomerListSheet.getLastRow() - 2, 3).find(custNum => custNum[0] === customerNum)
+  const customerName = (possibleCustomerName != null) ? possibleCustomerName.pop() : customerNum;
+  const invoicedItemSheet = spreadsheet.getSheetByName("Inv'd").activate(); 
+  const numCurrentItems = invoicedItemSheet.getLastRow() - 2;
+  invoicedItemSheet?.getFilter()?.remove(); // Remove the filter
 
-  const purchaseOrderNumber = itemManagement_ReceiptsWithPos.find(rct => rct[1] === receiptNumber)[0];
-  const recdItemSheet = spreadsheet.getSheetByName("Rec'd").activate(); 
-  const numCurrentItems = recdItemSheet.getLastRow() - 2;
-  recdItemSheet?.getFilter()?.remove(); // Remove the filter
+  Logger.log('Invoice Number: ' + invoiceNumber)
 
-  Logger.log('Receipt Number: ' + receiptNumber)
-
-  const newItems = items.map(item => [invoiceDate, vendorName, item[orderedQtyIdx], item[receivedQtyIdx], item[backOrderQtyIdx], 
-    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, receiptNumber])
+  const newItems = items.map(item => [invoiceDate, customerName, item[orderedQtyIdx], item[shippedQtyIdx], item[backOrderQtyIdx], 
+    removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], locationName , orderNumber, invoiceNumber])
 
   const numNewItems = newItems.length;
   const numCols = newItems[0].length;
-  const receiptNumCol = recdItemSheet.getLastColumn();
+  const invoiceNumCol = invoicedItemSheet.getLastColumn();
 
   if (numCurrentItems > 0)
-    recdItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+    invoicedItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
         .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
-      .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: receiptNumCol, ascending: true}]);
+      .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: invoiceNumCol, ascending: true}]);
   else
-    recdItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+    invoicedItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
 
-  Logger.log("The following new received items were added to the Rec'd tab:")
+  Logger.log("The following new invoiced items were added to the Inv'd tab:")
   Logger.log(newItems)
 
-  spreadsheet.toast(numNewItems + ' Added ', "Rec'd Items Imported", 60)
+  spreadsheet.toast(numNewItems + ' Added ', "Inv'd Items Imported", 60)
 
   SpreadsheetApp.flush()
-  recdItemSheet.getRange(2, 1, recdItemSheet.getLastRow() - 1, receiptNumCol).createFilter(); // Create a filter in the header
+  invoicedItemSheet.getRange(2, 1, invoicedItemSheet.getLastRow() - 1, invoiceNumCol).createFilter(); // Create a filter in the header
 }
 
 /**
@@ -1625,7 +1626,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const locationIdx = headerOE.indexOf('Loc');
   const isItemCompleteIdx = headerOE.indexOf('Complete?');
   const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
-  const orderNumber = getOrderNumber(ordNum);
+  const orderNumber = getOrderNumber(ordNum, false);
 
   const lodgeCustomerSheet = spreadsheet.getSheetByName('Lodge Customer List');
   const charterGuideCustomerSheet = spreadsheet.getSheetByName('Charter & Guide Customer List');
