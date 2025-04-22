@@ -1550,28 +1550,35 @@ function triggers_DeleteAll()
 function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
 {
   items.pop(); // Remove the "Total" or final line
-  const months = {'01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'};
   
   // Get all the indexes of the relevant headers
   const headerOE = items.shift();
-  const invoiceDate = getDateString(items[0][headerOE.indexOf('Date')], months);
-  const customerNum = items[0][headerOE.indexOf('Cust #')];
+  const isInvoicedHistory = items[0][headerOE.indexOf('Cust #')] === ' ';
   const orderedQtyIdx = headerOE.indexOf('Ordered');
   const shippedQtyIdx = headerOE.indexOf('Shipped'); 
   const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
   const skuIdx = headerOE.indexOf('Item');
   const descriptionIdx = headerOE.indexOf('Description');
-  const unitPriceIdx = headerOE.indexOf('Display Price');
-  const extendedunitPriceIdx = headerOE.indexOf('Display Ext Price');
+  const unitPriceIdx = isInvoicedHistory && headerOE.indexOf('Unit Price') || headerOE.indexOf('Display Price');
+  const extendedunitPriceIdx = isInvoicedHistory && headerOE.indexOf('Extension') || headerOE.indexOf('Display Ext Price');
   const locationName = getLocationName(items[0][headerOE.indexOf('Loc')]);
-  
   const invoiceNumber = getOrderNumber(invNum, true);
-  const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
-  const itemManagement_InvoicesWithOrders = itemManagementSheet.getSheetValues(2, 16, itemManagementSheet.getLastRow() - 1, 2).filter(u => !isBlank(u[1]))
-  const orderNumber = itemManagement_InvoicesWithOrders.find(inv => inv[1] === invoiceNumber)[0];
-  const fullCustomerListSheet = spreadsheet.getSheetByName('Full Customer List').activate(); 
-  const possibleCustomerName = fullCustomerListSheet.getSheetValues(3, 1, fullCustomerListSheet.getLastRow() - 2, 3).find(custNum => custNum[0] === customerNum)
-  const customerName = (possibleCustomerName != null) ? possibleCustomerName.pop() : customerNum;
+  const completedOrdersSheet_Lodge = spreadsheet.getSheetByName('LODGE COMPLETED')
+  const completedOrdersSheet_Guide = spreadsheet.getSheetByName('GUIDE COMPLETED')
+  const numCols_CompletedSheet = completedOrdersSheet_Lodge.getLastColumn();
+  const numCompletedLodgeOrders = completedOrdersSheet_Lodge.getLastRow() - 2;
+  const numCompletedGuideOrders = completedOrdersSheet_Guide.getLastRow() - 2;
+
+  const completedOrder = (numCompletedGuideOrders === 0) ? completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet).find(invNum => invNum[10] == invoiceNumber) : 
+                         (numCompletedGuideOrders === 0) ? completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet).find(invNum => invNum[10] == invoiceNumber) : 
+                            completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
+                              .concat(completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet))
+                            .find(invNum => invNum[10] == invoiceNumber)
+    
+  const invoiceDate  = completedOrder.pop();
+  const customerName = completedOrder[5];
+  const orderNumber  = completedOrder[2];
+
   const invoicedItemSheet = spreadsheet.getSheetByName("Inv'd").activate(); 
   const numCurrentItems = invoicedItemSheet.getLastRow() - 2;
   invoicedItemSheet?.getFilter()?.remove(); // Remove the filter
@@ -1636,7 +1643,14 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
   const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
   const partialOrdersSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)');
-  const enteredByNamesAndApprovalStatus = lodgeOrdersSheet.getSheetValues(3, 2, lodgeOrdersSheet.getLastRow() - 2, 3).concat(guideOrdersSheet.getSheetValues(3, 2, guideOrdersSheet.getLastRow() - 2, 3));
+
+  const numLodgeOrders = lodgeOrdersSheet.getLastRow() - 2;
+  const numGuideOrders = guideOrdersSheet.getLastRow() - 2;
+
+  const enteredByNamesAndApprovalStatus = (numGuideOrders === 0) ? lodgeOrdersSheet.getSheetValues(3, 2, numLodgeOrders, 3) : 
+                                          (numLodgeOrders === 0) ? guideOrdersSheet.getSheetValues(3, 2, numGuideOrders, 3) : 
+                                          lodgeOrdersSheet.getSheetValues(3, 2, numLodgeOrders, 3).concat(guideOrdersSheet.getSheetValues(3, 2, numGuideOrders, 3));
+
   const customerNames = lodgeCustomerSheet.getSheetValues(3, 1, lodgeCustomerSheet.getLastRow() - 2, 3).concat(charterGuideCustomerSheet.getSheetValues(3, 1, charterGuideCustomerSheet.getLastRow() - 2, 3))
   const orderNumbers_BO = partialOrdersSheet.getSheetValues(2, 1, partialOrdersSheet.getRange(partialOrdersSheet.getLastRow(), 1).getNextDataCell(SpreadsheetApp.Direction.UP).getRow() - 1, 1).flat()
 
