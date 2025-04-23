@@ -1153,6 +1153,8 @@ function manageDocumentNumbers(e, sheet, spreadsheet)
         .offset(0, 0, 1, 2).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
         .offset(0, 3, 1, 2).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
         .offset(0, 3, 1, 3).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
+        .offset(0, 4, 1, 4).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
+        .offset(0, 5, 1, 3).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK)
         .offset(0, 4, 1, 4).setBorder(null, true, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK);
 
     if (col !== 12) // POs
