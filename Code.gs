@@ -1589,18 +1589,18 @@ function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
     .map(item => 
       [invoiceDate, customerName, item[orderedQtyIdx], item[shippedQtyIdx], item[backOrderQtyIdx], 
       removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], 
-      locationName , orderNumber, invoiceNumber])
+      locationName , orderNumber, invoiceNumber, ''])
 
   const numNewItems = newItems.length;
   const numCols = newItems[0].length;
-  const invoiceNumCol = invoicedItemSheet.getLastColumn();
+  const invoiceNumCol = invoicedItemSheet.getLastColumn() - 1;
 
   if (numCurrentItems > 0)
     invoicedItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-        .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+        .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@'])).setValues(newItems)
       .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: invoiceNumCol, ascending: true}]);
   else
-    invoicedItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@'])).setValues(newItems)
+    invoicedItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@'])).setValues(newItems)
 
   Logger.log("The following new invoiced items were added to the Inv'd tab:")
   Logger.log(newItems)
@@ -1608,7 +1608,7 @@ function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
   spreadsheet.toast(numNewItems + ' Added ', "Inv'd Items Imported", 60)
 
   SpreadsheetApp.flush()
-  invoicedItemSheet.getRange(2, 1, invoicedItemSheet.getLastRow() - 1, invoiceNumCol).createFilter(); // Create a filter in the header
+  invoicedItemSheet.getRange(2, 1, invoicedItemSheet.getLastRow() - 1, invoiceNumCol + 1).createFilter(); // Create a filter in the header
 }
 
 /**
