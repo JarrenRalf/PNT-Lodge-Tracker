@@ -145,7 +145,7 @@ function installedOnOpen(e)
   // else
   //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
-  setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
+  setItemLinks(lodgeOrdersSheet, spreadsheet)
 }
 
 /**
@@ -894,6 +894,103 @@ function emailCostChangeOfLeadOrFrozenBait()
 }
 
 /**
+ * This function is passed the completed sheets and it sets the hyperlinks from those sheets to the Inv'd page.
+ * 
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two completed sheets
+ * @author Jarren Ralf 
+ */
+function establishItemLinks_INVD(spreadsheet, ...sheets)
+{
+  const invdSheet = spreadsheet.getSheetByName("Inv'd")
+  invdSheet?.getFilter()?.remove(); // Remove the filter
+  SpreadsheetApp.flush();
+
+  const invdSheet_NumRows = invdSheet.getLastRow() - 1
+  invdSheet.getRange(2, 1, invdSheet_NumRows, invdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the invoice number
+  SpreadsheetApp.flush();
+
+  const invoiceNumbers_Invd = (invdSheet_NumRows > 1) ? invdSheet.getSheetValues(3, 12, invdSheet_NumRows - 1, 1) : null;
+  const invdSheetId = invdSheet.getSheetId()
+  var invoiceNumber, row_invd;
+
+  sheets.map(sheet => {
+
+    var numRows = sheet.getLastRow() - 2;
+
+    if (numRows > 0)
+    {
+      var range = sheet.getRange(3, 11, numRows, 1)
+      
+      var invoiceNumbers = range.getRichTextValues().map(invNum => {
+        invoiceNumber = invNum[0].getText();
+        row_invd = (invoiceNumbers_Invd != null) ? invoiceNumbers_Invd.findIndex(inv => inv[0] === invoiceNumber) + 3 : -1;
+
+        return (row_invd > 2) ? [invNum[0].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceNumbers_Invd.findLastIndex(inv => inv[0] === invoiceNumber) + 3)).build()] : invNum;
+      })
+
+      range.setRichTextValues(invoiceNumbers);
+    }
+  })
+}
+
+/**
+ * This function is passed the order sheets and it sets the hyperlinks from those sheets to the I/O and B/O pages.
+ * 
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two order sheets
+ * @author Jarren Ralf 
+ */
+function establishItemLinks_IO_BO(spreadsheet, ...sheets)
+{
+  const boSheet = spreadsheet.getSheetByName('B/O')
+  const ioSheet = spreadsheet.getSheetByName('I/O')
+  boSheet?.getFilter()?.remove(); // Remove the filter
+  ioSheet?.getFilter()?.remove(); // Remove the filter
+  SpreadsheetApp.flush();
+
+  const boSheet_NumRows = boSheet.getLastRow() - 1
+  const ioSheet_NumRows = ioSheet.getLastRow() - 1
+  boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  SpreadsheetApp.flush();
+
+  const orderNumbers_BO = (boSheet_NumRows > 1) ? boSheet.getSheetValues(3, 11, boSheet_NumRows - 1, 1) : null;
+  const orderNumbers_IO = (ioSheet_NumRows > 1) ? ioSheet.getSheetValues(3, 11, ioSheet_NumRows - 1, 1) : null;
+  const boSheetId = boSheet.getSheetId()
+  const ioSheetId = ioSheet.getSheetId()
+  var orderNumber, row_io, row_bo;
+
+  sheets.map(sheet => {
+
+    var numRows = sheet.getLastRow() - 2;
+
+    if (numRows > 0)
+    {
+      var range = sheet.getRange(3, 3, numRows, 1)
+
+      var orderNumbers = range.getRichTextValues().map(ordNum => {
+        orderNumber = ordNum[0].getText();
+        row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
+
+        if (row_io > 2)
+          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
+        else if (orderNumbers_BO != null) // Make sure there are back order items on the list
+        {
+          row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
+
+          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()] : ordNum;
+        }
+        else 
+          return ordNum;
+      })
+
+      range.setRichTextValues(orderNumbers);
+    }
+  })
+}
+
+/**
  * This function gets the chart data
  * 
  * @author Jarren Ralf
@@ -1417,87 +1514,31 @@ function setColumnWidths()
 }
 
 /**
- * This function takes all of the order numbers on the LODGE ORDERS sheet and it hyperlinks them so that they link to the corresponding
- * set of items that are either on the BO sheet or the IO sheet.
+ * This function takes all of the order numbers on the LODGE ORDERS and GUIDE ORDERS sheets and it hyperlinks them to the corresponding
+ * set of items that are either on the BO sheet or the IO sheet. In addition, this function takes all of the invoice numbers on the LODGE COMPLETED and GUIDE COMPLETED sheets
+ * and it hyperlinks them so that they link to the corresponding set of items that are on the Inv'd sheet. 
  * 
  * @param {Sheet}  lodgeOrdersSheet : The LODGE ORDERS sheet.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @author Jarren Ralf 
  */
-function setBoOrIoItemLinksOnLodgeOrdersSheet(lodgeOrdersSheet, spreadsheet)
+function setItemLinks(lodgeOrdersSheet, spreadsheet)
 {
-  spreadsheet.toast('Order # hyperlinks being established...', '', -1)
-  var orderNumber, row_bo, row_io;
-  const boSheet = spreadsheet.getSheetByName('B/O')
-  const ioSheet = spreadsheet.getSheetByName('I/O')
-  boSheet?.getFilter()?.remove(); // Remove the filter
-  ioSheet?.getFilter()?.remove(); // Remove the filter
-  const boSheetId = boSheet.getSheetId()
-  const ioSheetId = ioSheet.getSheetId()
-  const boSheet_LastRow = boSheet.getLastRow()
-  const ioSheet_LastRow = ioSheet.getLastRow()
-  boSheet.getRange(2, 1, boSheet_LastRow - 1, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
-  ioSheet.getRange(2, 1, ioSheet_LastRow - 1, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  spreadsheet.toast('Order and Invoice # hyperlinks being established...', '', -1)
+
+  const   poSheet = spreadsheet.getSheetByName('P/O')
+  const recdSheet = spreadsheet.getSheetByName("Rec'd")
+    poSheet?.getFilter()?.remove(); // Remove the filter
+  recdSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-  const orderNumbers_BO = (boSheet_LastRow > 2) ? boSheet.getSheetValues(3, 11, boSheet_LastRow - 2, 1) : null;
-  const orderNumbers_IO = (ioSheet_LastRow > 2) ? ioSheet.getSheetValues(3, 11, ioSheet_LastRow - 2, 1) : null;
+    poSheet.getRange(2, 1,   poSheet.getLastRow() - 1,   poSheet.getLastColumn()).createFilter().sort(10, true); // Create a filter in the header and sort by the purchase order number
+  recdSheet.getRange(2, 1, recdSheet.getLastRow() - 1, recdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the receipt number
+  SpreadsheetApp.flush();
 
-  const numLodgeOrders = lodgeOrdersSheet.getLastRow() - 2;
-
-  if (numLodgeOrders > 0)
-  {
-    const orderNumbersRange_Lodge = lodgeOrdersSheet.getRange(3, 3, numLodgeOrders, 1)
-
-    const orderNumbers_Lodge = orderNumbersRange_Lodge.getRichTextValues().map(ordNum => {
-      orderNumber = ordNum[0].getText();
-      row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
-
-      if (row_io > 2)
-        return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
-      else if (orderNumbers_BO != null) // Make sure there are back order items on the list
-      {
-        row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
-
-        return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()] : ordNum;
-      }
-      else 
-        return ordNum;
-    })
-
-    orderNumbersRange_Lodge.setRichTextValues(orderNumbers_Lodge);
-  }
-  
-  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
-  const numGuideOrders = guideOrdersSheet.getLastRow() - 2;
-
-  if (numGuideOrders > 0)
-  {
-    const orderNumbersRange_Guide = guideOrdersSheet.getRange(3, 3, numGuideOrders, 1)
-
-    const orderNumbers_Guide = orderNumbersRange_Guide.getRichTextValues().map(ordNum => {
-      orderNumber = ordNum[0].getText();
-      row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
-
-      if (row_io > 2)
-        return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
-      else if (orderNumbers_BO != null) // Make sure there are back order items on the list
-      {
-        row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
-
-        if (row_bo > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_io + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]
-        else
-          return ordNum;
-      }
-      else 
-        return ordNum;
-    })
-
-    orderNumbersRange_Guide.setRichTextValues(orderNumbers_Guide);
-  }
-
-  spreadsheet.toast('Order # hyperlinks completed.', '')
+  establishItemLinks_IO_BO(spreadsheet,                              lodgeOrdersSheet, spreadsheet.getSheetByName('GUIDE ORDERS'))
+  establishItemLinks_INVD( spreadsheet, spreadsheet.getSheetByName('LODGE COMPLETED'), spreadsheet.getSheetByName('GUIDE COMPLETED'))
+  spreadsheet.toast('Order and Invoice # hyperlinks completed.', '')
 }
 
 /**
@@ -1841,7 +1882,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12')) 
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
-        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((isBlank(order[invoiceDateIdx].toString())) ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Lodge Completed
+        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((order[invoiceDateIdx].toString() == ' ') ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Lodge Completed
       })) :
     allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
@@ -1866,7 +1907,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           (order[dateIdx].substring(0, 2) === '09' || order[dateIdx].substring(0, 2) === '10' || order[dateIdx].substring(0, 2) === '11' || order[dateIdx].substring(0, 2) === '12'))
           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) === currentYear))
         && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
-        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((isBlank(order[invoiceDateIdx].toString())) ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Charter & Guide Completed
+        return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((order[invoiceDateIdx].toString() == ' ') ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Charter & Guide Completed
       })) :
     allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) === lastYear &&
