@@ -15,7 +15,7 @@ function onChange(e)
     var sheets = spreadsheet.getSheets();
     var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, 
     isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, 
-    isInvoicedItems = 10, nRows = 0, nCols = 0;
+    isInvoicedItems = 10, isCreditedItems = 11, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -35,7 +35,9 @@ function onChange(e)
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Original Ordered')   : false, 
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Qty Originally Ordered') : false,
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Ordered')                : false
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Ordered')                : false,
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Return') || 
+                                     sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Returned')               : false
         ]
 
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
@@ -64,7 +66,9 @@ function onChange(e)
           else if (info[isPurchaseOrderItems])
             updatePoItemsOnTracker(values, spreadsheet);
           else if (info[isInvoicedItems])
-            updateInvoicedItemsOnTracker(values, spreadsheet, fileName);
+            updateInvoicedItemsOnTracker(values, spreadsheet, fileName, false);
+          else if (info[isCreditedItems])
+            updateInvoicedItemsOnTracker(values, spreadsheet, fileName, true);
           
           break;
         }
@@ -1141,18 +1145,19 @@ function getLocationName(locationCode)
  * If there are any uynexpected inputs, the order number is left blank.
  * 
  * @param {String}     ordNum    : The tab name of the imported excel spreadsheet (assumed to be the order number)
- * @param {Boolean} isInvoiceNum : Weather the order being imported is an invoice or not.
+ * @param {Boolean} isInvoiceNum : Whether the order being imported is an invoice or not.
+ * @param {Boolean} isCreditNum  : Whether the order being imported is a credit or not.
  * @returns {String} Returns the order number if it has been determined to be correct, or blank otherwise.
  * @auther Jarren Ralf
  */
-function getOrderNumber(ordNum, isInvoiceNum)
+function getOrderNumber(ordNum, isInvoiceNum, isCreditNum)
 {
   if (isNumber(ordNum) && ordNum.toString().length === 5)
     return ordNum;
   else
   {
     const ui = SpreadsheetApp.getUi();
-    const response = ui.prompt((isInvoiceNum) ? 'Enter the invoice number:' : 'Enter the order number:',);
+    const response = ui.prompt((isInvoiceNum) ? (isCreditNum) ? 'Enter the credit number:' : 'Enter the invoice number:' : 'Enter the order number:',);
     const orderNumber = response.getResponseText().trim(); 
 
     return (response.getSelectedButton() !== ui.Button.OK) ? '' : (isNumber(orderNumber) && orderNumber.length === 5) ? orderNumber : '';
@@ -1590,49 +1595,84 @@ function triggers_DeleteAll()
  * @param {String}        invNum    : The invoice number that is being imported.
  * @author Jarren Ralf
  */
-function updateInvoicedItemsOnTracker(items, spreadsheet, invNum)
+function updateInvoicedItemsOnTracker(items, spreadsheet, invNum, isCreditedItems)
 {
   items.pop(); // Remove the "Total" or final line
   
   // Get all the indexes of the relevant headers
   const headerOE = items.shift();
   const isInvoicedHistory = items[0][headerOE.indexOf('Cust #')] === ' ';
+  const returnedQtyIdx = headerOE.indexOf('Quantity');
   const orderedQtyIdx = headerOE.indexOf('Ordered');
   const shippedQtyIdx = headerOE.indexOf('Shipped'); 
   const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
   const skuIdx = headerOE.indexOf('Item');
   const descriptionIdx = headerOE.indexOf('Description');
-  const unitPriceIdx = isInvoicedHistory && headerOE.indexOf('Unit Price') || headerOE.indexOf('Display Price');
-  const extendedunitPriceIdx = isInvoicedHistory && headerOE.indexOf('Extension') || headerOE.indexOf('Display Ext Price');
+  const unitPriceIdx = isInvoicedHistory && headerOE.indexOf('Unit Price') || 
+                       isCreditedItems   && headerOE.indexOf('Unit Price') || headerOE.indexOf('Display Price');
+  const extendedunitPriceIdx = isInvoicedHistory && headerOE.indexOf('Extension') ||
+                               isCreditedItems   && headerOE.indexOf('Extension') || headerOE.indexOf('Display Ext Price');
   const locationName = getLocationName(items[0][headerOE.indexOf('Loc')]);
-  const invoiceNumber = getOrderNumber(invNum, true);
   const completedOrdersSheet_Lodge = spreadsheet.getSheetByName('LODGE COMPLETED')
   const completedOrdersSheet_Guide = spreadsheet.getSheetByName('GUIDE COMPLETED')
   const numCols_CompletedSheet = completedOrdersSheet_Lodge.getLastColumn();
   const numCompletedLodgeOrders = completedOrdersSheet_Lodge.getLastRow() - 2;
   const numCompletedGuideOrders = completedOrdersSheet_Guide.getLastRow() - 2;
 
-  const completedOrder = (numCompletedGuideOrders === 0) ? completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet).find(invNum => invNum[10] == invoiceNumber) : 
-                         (numCompletedGuideOrders === 0) ? completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet).find(invNum => invNum[10] == invoiceNumber) : 
-                            completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
-                              .concat(completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet))
-                            .find(invNum => invNum[10] == invoiceNumber)
-    
-  const invoiceDate  = completedOrder.pop();
-  const customerName = completedOrder[5];
-  const orderNumber  = completedOrder[2];
-
   const invoicedItemSheet = spreadsheet.getSheetByName("Inv'd").activate(); 
   const numCurrentItems = invoicedItemSheet.getLastRow() - 2;
   invoicedItemSheet?.getFilter()?.remove(); // Remove the filter
 
-  Logger.log('Invoice Number: ' + invoiceNumber)
+  if (isCreditedItems)
+  {
+    const creditNumber = getOrderNumber(invNum, true, isCreditedItems);
+    Logger.log('Credit Number: ' + creditNumber)
 
-  const newItems = items.filter(shippedQty => shippedQty[shippedQtyIdx] != 0) // Remove the items that weren't shipped
-    .map(item => 
+    const completedOrder = (numCompletedGuideOrders === 0) ? 
+      completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
+        .find(credtNum => credtNum[9].includes(creditNumber))
+      : (numCompletedGuideOrders === 0) ? 
+        completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet)
+          .find(credtNum => credtNum[9].includes(creditNumber))
+        : completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
+          .concat(completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet))
+            .find(credtNum => credtNum[9].includes(creditNumber))
+    
+    const invoiceDate   = completedOrder.pop();
+    const customerName  = completedOrder[ 5];
+    const orderNumber   = completedOrder[ 2];
+    const invoiceNumber = completedOrder[10];
+
+    var newItems = items.filter(returnedQty => returnedQty[returnedQtyIdx] != 0).map(item => 
+      [invoiceDate, customerName, '', -1*item[returnedQtyIdx], '', 
+      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], 
+      locationName , orderNumber, invoiceNumber, creditNumber])
+   
+  }
+  else
+  {
+    const invoiceNumber = getOrderNumber(invNum, true);
+    Logger.log('Invoice Number: ' + invoiceNumber)
+
+    const completedOrder = (numCompletedGuideOrders === 0) ? 
+      completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
+        .find(invNum => invNum[10] == invoiceNumber) 
+      : (numCompletedGuideOrders === 0) ? 
+        completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet)
+          .find(invNum => invNum[10] == invoiceNumber) 
+        : completedOrdersSheet_Lodge.getSheetValues(3, 1, numCompletedLodgeOrders, numCols_CompletedSheet)
+          .concat(completedOrdersSheet_Guide.getSheetValues(3, 1, numCompletedGuideOrders, numCols_CompletedSheet))
+            .find(invNum => invNum[10] == invoiceNumber)
+    
+    const invoiceDate  = completedOrder.pop();
+    const customerName = completedOrder[5];
+    const orderNumber  = completedOrder[2];
+
+    var newItems = items.filter(shippedQty => shippedQty[shippedQtyIdx] != 0).map(item =>  // Remove the items that weren't shipped
       [invoiceDate, customerName, item[orderedQtyIdx], item[shippedQtyIdx], item[backOrderQtyIdx], 
       removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], 
       locationName , orderNumber, invoiceNumber, ''])
+  }
 
   const numNewItems = newItems.length;
   const numCols = newItems[0].length;
