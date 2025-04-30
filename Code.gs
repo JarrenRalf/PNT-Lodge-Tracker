@@ -914,26 +914,46 @@ function establishItemLinks_INVD(spreadsheet, ...sheets)
   invdSheet.getRange(2, 1, invdSheet_NumRows, invdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the invoice number
   SpreadsheetApp.flush();
 
-  const invoiceNumbers_Invd = (invdSheet_NumRows > 1) ? invdSheet.getSheetValues(3, 12, invdSheet_NumRows - 1, 1) : null;
+  const invoiceAndCreditNumbers_Invd = (invdSheet_NumRows > 1) ? invdSheet.getSheetValues(3, 12, invdSheet_NumRows - 1, 2) : null;
   const invdSheetId = invdSheet.getSheetId()
-  var invoiceNumber, row_invd;
+  var invoiceNumber, notes, isCreditNumInNotes, creditNumber, startIndex, endIndex, row_invd, row_cred, numRows, range, notesAndinvoiceNumbers;
 
   sheets.map(sheet => {
 
-    var numRows = sheet.getLastRow() - 2;
+    numRows = sheet.getLastRow() - 2;
 
     if (numRows > 0)
     {
-      var range = sheet.getRange(3, 11, numRows, 1)
+      range = sheet.getRange(3, 10, numRows, 2)
       
-      var invoiceNumbers = range.getRichTextValues().map(invNum => {
-        invoiceNumber = invNum[0].getText();
-        row_invd = (invoiceNumbers_Invd != null) ? invoiceNumbers_Invd.findIndex(inv => inv[0] === invoiceNumber) + 3 : -1;
+      notesAndinvoiceNumbers = range.getRichTextValues().map(rowVals => {
+        invoiceNumber = rowVals[1].getText();
+        notes = rowVals[0].getText();
+        isCreditNumInNotes = notes.match(/\d{5}/); // match 5-digit number
+        row_invd = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(inv => inv[0] === invoiceNumber && isBlank(inv[1])) + 3 : -1;
+        row_cred = -1, creditNumber = '';
 
-        return (row_invd > 2) ? [invNum[0].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceNumbers_Invd.findLastIndex(inv => inv[0] === invoiceNumber) + 3)).build()] : invNum;
+        if (isCreditNumInNotes)
+        {
+          creditNumber = isCreditNumInNotes[0];
+          startIndex = notes.indexOf(creditNumber);
+          endIndex = startIndex + creditNumber.length;
+          row_cred = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(cred => cred[1] === creditNumber) + 3 : -1;
+        }
+
+        return (row_invd > 2 && row_cred > 2) ? 
+            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] === creditNumber) + 3)).build(),
+             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] === invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
+          (row_invd > 2) ? 
+            [rowVals[0],
+             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] === invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
+          (row_cred > 2) ? 
+            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] === creditNumber) + 3)).build(),
+             rowVals[1]] :
+          rowVals;
       })
 
-      range.setRichTextValues(invoiceNumbers);
+      range.setRichTextValues(notesAndinvoiceNumbers);
     }
   })
 }
@@ -949,47 +969,222 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 {
   const boSheet = spreadsheet.getSheetByName('B/O')
   const ioSheet = spreadsheet.getSheetByName('I/O')
+  const poSheet = spreadsheet.getSheetByName('P/O')
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-  const boSheet_NumRows = boSheet.getLastRow() - 1
-  const ioSheet_NumRows = ioSheet.getLastRow() - 1
+  const boSheet_NumRowsPlusHeader = boSheet.getLastRow() - 1
+  const ioSheet_NumRowsPlusHeader = ioSheet.getLastRow() - 1
+  const boSheet_NumRows = boSheet_NumRowsPlusHeader - 1;
+  const ioSheet_NumRows = ioSheet_NumRowsPlusHeader - 1;
+  const poSheet_NumRows = poSheet.getLastRow() - 2
   boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
 
-  const orderNumbers_BO = (boSheet_NumRows > 1) ? boSheet.getSheetValues(3, 11, boSheet_NumRows - 1, 1) : null;
-  const orderNumbers_IO = (ioSheet_NumRows > 1) ? ioSheet.getSheetValues(3, 11, ioSheet_NumRows - 1, 1) : null;
+  const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 1, 6) : null;
+  const orderNumbersAndSku_IO = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows - 1, 6) : null;
   const boSheetId = boSheet.getSheetId()
   const ioSheetId = ioSheet.getSheetId()
-  var orderNumber, row_io, row_bo;
+  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, row_io, row_bo;
 
   sheets.map(sheet => {
 
-    var numRows = sheet.getLastRow() - 2;
+    numRows = sheet.getLastRow() - 2;
 
     if (numRows > 0)
     {
-      var range = sheet.getRange(3, 3, numRows, 1)
+      range = sheet.getRange(3, 3, numRows, 1)
 
-      var orderNumbers = range.getRichTextValues().map(ordNum => {
+      orderNumbers = range.getRichTextValues().map(ordNum => {
         orderNumber = ordNum[0].getText();
-        row_io = (orderNumbers_IO != null) ? orderNumbers_IO.findIndex(ord => ord[0] === orderNumber) + 3 : -1;
+        row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] === orderNumber) + 3 : -1;
 
         if (row_io > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbers_IO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()]      
-        else if (orderNumbers_BO != null) // Make sure there are back order items on the list
+          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] === orderNumber) + 3)).build()]      
+        else if (orderNumbersAndSku_BO) // Make sure there are back order items on the list
         {
-          row_bo = orderNumbers_BO.findIndex(ord => ord[0] === orderNumber) + 3;
+          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] === orderNumber) + 3;
 
-          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbers_BO.findLastIndex(ord => ord[0] === orderNumber) + 3)).build()] : ordNum;
+          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] === orderNumber) + 3)).build()] : ordNum;
         }
         else 
           return ordNum;
       })
 
       range.setRichTextValues(orderNumbers);
+    }
+  })
+
+  if (poSheet_NumRows > 0)
+  {
+    skus = poSheet.getSheetValues(3, 5, poSheet_NumRows, 1)
+    range = poSheet.getRange(3, 11, poSheet_NumRows, 1)
+
+    orderNumbers = range.getRichTextValues().map((noteValues, sku) => {
+
+      notes = noteValues[0].getText();
+      orderNumbersInNotes = [...notes.matchAll(/\b\d{5}\b/g)];
+
+      Logger.log(orderNumbersInNotes)
+
+      if (orderNumbersInNotes.length > 0) // If there are order numbers in the notes
+      {
+        richTextBuilder = noteValues[0].copy();
+
+        orderNumbersInNotes.map(ordNum => {
+          orderNumber = ordNum[0];
+          startIndex = notes.indexOf(orderNumber);
+          endIndex = startIndex + orderNumber.length;
+          row_bo = (orderNumbersAndSku_BO) ? orderNumbersAndSku_BO.findIndex(ord => ord[5] === orderNumber && ord[0] === skus[sku][0]) + 3 : -1;
+          row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] === orderNumber && ord[0] === skus[sku][0]) + 3 : -1;
+
+          if (row_bo > 2)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + boSheetId + '&range=A' + row_bo + ':N' + row_bo)
+          else if (row_io > 2)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + ioSheetId + '&range=A' + row_io + ':N' + row_io)
+        })
+
+
+        return [richTextBuilder.build()];
+      }
+      else // No order numbers in the notes
+        return noteValues;
+    })
+
+    range.setRichTextValues(orderNumbers); 
+  }
+}
+
+function hyperlinkOrderNumbers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const poSheet = ss.getSheetByName('PO Sheet'); // Replace with your actual sheet name
+  const ioSheet = ss.getSheetByName('IO Sheet'); // Replace with actual name
+  const boSheet = ss.getSheetByName('BO Sheet'); // Replace with actual name
+  const skuSheet = ss.getSheetByName('SKU Sheet'); // Replace if needed
+  
+  const poSheet_NumRows = poSheet.getLastRow() - 2;
+  const range = poSheet.getRange(3, 11, poSheet_NumRows, 1); // Column K
+  const cellValues = range.getValues();
+
+  const ioSheetId = ioSheet.getSheetId();
+  const boSheetId = boSheet.getSheetId();
+
+  const ioSheet_NumRows = ioSheet.getLastRow();
+  const boSheet_NumRows = boSheet.getLastRow();
+
+  const orderNumbersAndSku_IO = (ioSheet_NumRows > 2) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows - 2, 6) : null;
+  const orderNumbersAndSku_BO = (boSheet_NumRows > 2) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 2, 6) : null;
+
+  // Assume skus is a map of sku strings to arrays like [sku_code, ...]
+  const skus = {}; // Populate this appropriately in your actual code
+
+  const orderNumRegex = /\b\d{5}\b/g;
+  const richTextValues = [];
+
+  for (let i = 0; i < cellValues.length; i++) {
+    const cellText = cellValues[i][0];
+    const matches = [...cellText.matchAll(orderNumRegex)];
+
+    if (matches.length === 0) {
+      // No match, just set plain text
+      const richText = SpreadsheetApp.newRichTextValue()
+        .setText(cellText)
+        .build();
+      richTextValues.push([richText]);
+      continue;
+    }
+
+    const builder = SpreadsheetApp.newRichTextValue().setText(cellText);
+
+    for (const match of matches) {
+      const ordNumber = match[0];
+      const startIndex = match.index;
+      const endIndex = startIndex + ordNumber.length;
+
+      let row_io = -1;
+      let row_bo = -1;
+
+      // Try to identify SKU (this part depends on your implementation)
+      let sku = Object.keys(skus).find(skuKey => cellText.includes(skuKey));
+      let skuCode = (sku && skus[sku]) ? skus[sku][0] : null;
+
+      if (skuCode) {
+        if (orderNumbersAndSku_IO) {
+          row_io = orderNumbersAndSku_IO.findIndex(ord => ord[5] === ordNumber && ord[0] === skuCode) + 3;
+        }
+        if (orderNumbersAndSku_BO) {
+          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] === ordNumber && ord[0] === skuCode) + 3;
+        }
+      }
+
+      let linkUrl = null;
+      if (row_io > 2) {
+        linkUrl = `#gid=${ioSheetId}&range=A${row_io}:N${row_io}`;
+      } else if (row_bo > 2) {
+        linkUrl = `#gid=${boSheetId}&range=A${row_bo}:N${row_bo}`;
+      }
+
+      if (linkUrl) {
+        builder.setLinkUrl(startIndex, endIndex, linkUrl);
+      }
+    }
+
+    richTextValues.push([builder.build()]);
+  }
+
+  range.setRichTextValues(richTextValues);
+}
+
+/**
+ * This function is passed the B/O and I/O sheets and it sets the hyperlinks from those sheets to P/O sheet.
+ * 
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two item sheet, B/O and I/O
+ * @author Jarren Ralf 
+ */
+function establishItemLinks_PO(spreadsheet, ...sheets)
+{
+  const poSheet = spreadsheet.getSheetByName('P/O')
+  poSheet?.getFilter()?.remove(); // Remove the filter
+  SpreadsheetApp.flush();
+
+  const poSheet_NumRows = poSheet.getLastRow() - 1
+  poSheet.getRange(2, 1, poSheet_NumRows, poSheet.getLastColumn()).createFilter().sort(10, true); // Create a filter in the header and sort by the purchase order number
+  SpreadsheetApp.flush();
+
+  const purchaseOrderNumbersAndSku_PO = (poSheet_NumRows > 1) ? poSheet.getSheetValues(3, 5, poSheet_NumRows - 1, 6) : null;
+  const poSheetId = poSheet.getSheetId()
+  var numRows, skus, notesRange, purchaseOrderNumbers, poNumber, startIndex, endIndex, row;
+
+  sheets.map(sheet => {
+
+    numRows = sheet.getLastRow() - 2;
+
+    if (numRows > 0)
+    {
+      skus = sheet.getSheetValues(3,  6, numRows, 1)
+      notesRange = sheet.getRange(3, 12, numRows, 1)
+
+      purchaseOrderNumbers = notesRange.getRichTextValues().map((noteValues, sku) => {
+
+        notes = noteValues[0].getText();
+        isPoNumInNotes = notes.match(/PO0\d{5}/); // match 5-digit number
+        poNumber = '', row = -1;
+        
+        if (isPoNumInNotes)
+        {
+          poNumber = isPoNumInNotes[0];
+          startIndex = notes.indexOf(poNumber);
+          endIndex = startIndex + poNumber.length;
+          row = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
+        }
+
+        return (row > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + poSheetId + '&range=A' + row + ':M' + row).build()] : noteValues;
+      })
+
+      notesRange.setRichTextValues(purchaseOrderNumbers);
     }
   })
 }
@@ -1056,7 +1251,7 @@ function getEnteredByNameAndApprovalStatus(orderNumber, orders)
 {
   const enteredBy = orders.find(ordNum => ordNum[1] == orderNumber)
   
-  return (enteredBy != null) ? [enteredBy[0], enteredBy[2]] : '';
+  return (enteredBy) ? [enteredBy[0], enteredBy[2]] : '';
 }
 
 /**
@@ -1068,7 +1263,7 @@ function getEnteredByNameAndApprovalStatus(orderNumber, orders)
  */
 function getFullName(initials)
 {
-  if (initials != null)
+  if (initials)
   {
     switch (initials.trim())
     {
@@ -1189,7 +1384,7 @@ function getProperTypesetName(name, listOfNames, colSelector)
 {
   const properTypesetName = listOfNames.find(customer => customer[0] === name)
   
-  return (properTypesetName != null) ? properTypesetName[colSelector] : name;
+  return (properTypesetName) ? properTypesetName[colSelector] : name;
 }
 
 /**
@@ -1521,7 +1716,8 @@ function setColumnWidths()
 /**
  * This function takes all of the order numbers on the LODGE ORDERS and GUIDE ORDERS sheets and it hyperlinks them to the corresponding
  * set of items that are either on the BO sheet or the IO sheet. In addition, this function takes all of the invoice numbers on the LODGE COMPLETED and GUIDE COMPLETED sheets
- * and it hyperlinks them so that they link to the corresponding set of items that are on the Inv'd sheet. 
+ * and it hyperlinks them so that they link to the corresponding set of items that are on the Inv'd sheet. This function also takes all of the PO numbers on the I/O and B/O pages
+ * and it hyperlinks them so that they link to the corresponding set of items that are on the PO sheet.
  * 
  * @param {Sheet}  lodgeOrdersSheet : The LODGE ORDERS sheet.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
@@ -1531,18 +1727,16 @@ function setItemLinks(lodgeOrdersSheet, spreadsheet)
 {
   spreadsheet.toast('Order and Invoice # hyperlinks being established...', '', -1)
 
-  const   poSheet = spreadsheet.getSheetByName('P/O')
   const recdSheet = spreadsheet.getSheetByName("Rec'd")
-    poSheet?.getFilter()?.remove(); // Remove the filter
   recdSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-    poSheet.getRange(2, 1,   poSheet.getLastRow() - 1,   poSheet.getLastColumn()).createFilter().sort(10, true); // Create a filter in the header and sort by the purchase order number
   recdSheet.getRange(2, 1, recdSheet.getLastRow() - 1, recdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the receipt number
   SpreadsheetApp.flush();
 
   establishItemLinks_IO_BO(spreadsheet,                              lodgeOrdersSheet, spreadsheet.getSheetByName('GUIDE ORDERS'))
   establishItemLinks_INVD( spreadsheet, spreadsheet.getSheetByName('LODGE COMPLETED'), spreadsheet.getSheetByName('GUIDE COMPLETED'))
+  establishItemLinks_PO(   spreadsheet, spreadsheet.getSheetByName('I/O'),             spreadsheet.getSheetByName('B/O'))
   spreadsheet.toast('Order and Invoice # hyperlinks completed.', '')
 }
 
@@ -1904,7 +2098,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   if (lodgeSheetYear === (Number(currentYear) + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
 
-  if (lodgeSheetYear === currentYear) // Is this next years lodge sheet?
+  if (lodgeSheetYear === currentYear) // Is this the current lodge sheet?
     var isCurrentLodgeSeasonYear = true;
 
   const newLodgeOrders = 
@@ -2038,7 +2232,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
           isLodgeOrderComplete = lodgePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
 
-          if (isLodgeOrderComplete != null && isLodgeOrderComplete[1] === 'No')
+          if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
           {
             currentOrd[10] = 'multiple';
             currentOrd[13] = 'Partial Order';
@@ -2078,7 +2272,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         
           isCharterGuideOrderComplete = charterGuidePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
 
-          if (isCharterGuideOrderComplete != null && isCharterGuideOrderComplete[1] === 'No')
+          if (isCharterGuideOrderComplete && isCharterGuideOrderComplete[1] === 'No')
           {
             currentOrd[10] = 'multiple';
             currentOrd[13] = 'Partial Order';
@@ -2514,10 +2708,13 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   for (var i = 0; i < numPOs; i++)
   {
     // Make sure the PO is for this year
-    if (((includeLastYearsFinalQuarterOrders && allPurchaseOrders[i][dateIdx].toString().substring(6) === lastYear &&
+    if (((includeLastYearsFinalQuarterOrders && allPurchaseOrders[i][dateIdx].toString().substring(6).toString() === lastYear &&
       (allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '09' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '10' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '11' || allPurchaseOrders[i][dateIdx].toString().substring(0, 2) === '12')) 
-      || (isCurrentLodgeSeasonYear && allPurchaseOrders[i][dateIdx].toString().substring(6) === currentYear)))
+      || (isCurrentLodgeSeasonYear && allPurchaseOrders[i][dateIdx].toString().substring(6).toString() === currentYear)))
     {
+      Logger.log('PO Number: ' + allPurchaseOrders[i][poNumberIdx])
+      Logger.log('Status: ' + allPurchaseOrders[i][poStatusIdx])
+      
       if (allPurchaseOrders[i][poStatusIdx] !== 'PO Completed')
       {
         if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx]) && !itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
@@ -2529,6 +2726,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
       }
       else // PO is complete
       {
+        Logger.log('This PO is complete...')
         // Remove all lines that match this PO number from the P/O sheet
         itemManagement_Po_Idx = itemManagement_Po.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
         itemManagement_NonLodgePo_Idx = itemManagement_NonLodgePo.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
@@ -2549,6 +2747,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 
         poItems = poItems.filter(poNum => poNum[9] !== allPurchaseOrders[i][poNumberIdx]); // Remove the items from the P/O page
       }
+      Logger.log('-------------------------------------------')
     }
   }
 
