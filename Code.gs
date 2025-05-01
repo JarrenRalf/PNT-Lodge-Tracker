@@ -979,8 +979,8 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const boSheet_NumRows = boSheet_NumRowsPlusHeader - 1;
   const ioSheet_NumRows = ioSheet_NumRowsPlusHeader - 1;
   const poSheet_NumRows = poSheet.getLastRow() - 2
-  boSheet.getRange(2, 1, boSheet_NumRows, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
-  ioSheet.getRange(2, 1, ioSheet_NumRows, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
 
   const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 1, 6) : null;
