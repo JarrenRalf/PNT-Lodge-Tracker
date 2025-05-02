@@ -982,9 +982,9 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
     boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader ,   boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
     ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader ,   ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
-
-  const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 1, 6) : null;
-  const orderNumbersAndSku_IO = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows - 1, 6) : null;
+  
+  const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows, 6) : null;
+  const orderNumbersAndSku_IO = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows, 6) : null;
   const boSheetId = boSheet.getSheetId()
   const ioSheetId = ioSheet.getSheetId()
   var numRows, range, orderNumbers, orderNumber, row_io, row_bo, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, row_io, row_bo;
@@ -1006,7 +1006,7 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
         else if (orderNumbersAndSku_BO) // Make sure there are back order items on the list
         {
           row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] === orderNumber) + 3;
-
+        
           return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] === orderNumber) + 3)).build()] : ordNum;
         }
         else 
