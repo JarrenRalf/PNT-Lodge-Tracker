@@ -967,20 +967,20 @@ function establishItemLinks_INVD(spreadsheet, ...sheets)
  */
 function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 {
-  const boSheet = spreadsheet.getSheetByName('B/O')
-  const ioSheet = spreadsheet.getSheetByName('I/O')
-  const poSheet = spreadsheet.getSheetByName('P/O')
+  const   boSheet = spreadsheet.getSheetByName('B/O')
+  const   ioSheet = spreadsheet.getSheetByName('I/O')
+  const   poSheet = spreadsheet.getSheetByName('P/O')
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-  const boSheet_NumRowsPlusHeader = boSheet.getLastRow() - 1
-  const ioSheet_NumRowsPlusHeader = ioSheet.getLastRow() - 1
+  const boSheet_NumRowsPlusHeader = boSheet.getLastRow() - 1;
+  const ioSheet_NumRowsPlusHeader = ioSheet.getLastRow() - 1;
   const boSheet_NumRows = boSheet_NumRowsPlusHeader - 1;
   const ioSheet_NumRows = ioSheet_NumRowsPlusHeader - 1;
-  const poSheet_NumRows = poSheet.getLastRow() - 2
-  boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
-  ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  const poSheet_NumRows = poSheet.getLastRow() - 2;
+    boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader ,   boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+    ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader ,   ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
 
   const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 1, 6) : null;
@@ -1027,8 +1027,6 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
       notes = noteValues[0].getText();
       orderNumbersInNotes = [...notes.matchAll(/\b\d{5}\b/g)];
 
-      Logger.log(orderNumbersInNotes)
-
       if (orderNumbersInNotes.length > 0) // If there are order numbers in the notes
       {
         richTextBuilder = noteValues[0].copy();
@@ -1057,86 +1055,6 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   }
 }
 
-function hyperlinkOrderNumbers() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const poSheet = ss.getSheetByName('PO Sheet'); // Replace with your actual sheet name
-  const ioSheet = ss.getSheetByName('IO Sheet'); // Replace with actual name
-  const boSheet = ss.getSheetByName('BO Sheet'); // Replace with actual name
-  const skuSheet = ss.getSheetByName('SKU Sheet'); // Replace if needed
-  
-  const poSheet_NumRows = poSheet.getLastRow() - 2;
-  const range = poSheet.getRange(3, 11, poSheet_NumRows, 1); // Column K
-  const cellValues = range.getValues();
-
-  const ioSheetId = ioSheet.getSheetId();
-  const boSheetId = boSheet.getSheetId();
-
-  const ioSheet_NumRows = ioSheet.getLastRow();
-  const boSheet_NumRows = boSheet.getLastRow();
-
-  const orderNumbersAndSku_IO = (ioSheet_NumRows > 2) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows - 2, 6) : null;
-  const orderNumbersAndSku_BO = (boSheet_NumRows > 2) ? boSheet.getSheetValues(3, 6, boSheet_NumRows - 2, 6) : null;
-
-  // Assume skus is a map of sku strings to arrays like [sku_code, ...]
-  const skus = {}; // Populate this appropriately in your actual code
-
-  const orderNumRegex = /\b\d{5}\b/g;
-  const richTextValues = [];
-
-  for (let i = 0; i < cellValues.length; i++) {
-    const cellText = cellValues[i][0];
-    const matches = [...cellText.matchAll(orderNumRegex)];
-
-    if (matches.length === 0) {
-      // No match, just set plain text
-      const richText = SpreadsheetApp.newRichTextValue()
-        .setText(cellText)
-        .build();
-      richTextValues.push([richText]);
-      continue;
-    }
-
-    const builder = SpreadsheetApp.newRichTextValue().setText(cellText);
-
-    for (const match of matches) {
-      const ordNumber = match[0];
-      const startIndex = match.index;
-      const endIndex = startIndex + ordNumber.length;
-
-      let row_io = -1;
-      let row_bo = -1;
-
-      // Try to identify SKU (this part depends on your implementation)
-      let sku = Object.keys(skus).find(skuKey => cellText.includes(skuKey));
-      let skuCode = (sku && skus[sku]) ? skus[sku][0] : null;
-
-      if (skuCode) {
-        if (orderNumbersAndSku_IO) {
-          row_io = orderNumbersAndSku_IO.findIndex(ord => ord[5] === ordNumber && ord[0] === skuCode) + 3;
-        }
-        if (orderNumbersAndSku_BO) {
-          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] === ordNumber && ord[0] === skuCode) + 3;
-        }
-      }
-
-      let linkUrl = null;
-      if (row_io > 2) {
-        linkUrl = `#gid=${ioSheetId}&range=A${row_io}:N${row_io}`;
-      } else if (row_bo > 2) {
-        linkUrl = `#gid=${boSheetId}&range=A${row_bo}:N${row_bo}`;
-      }
-
-      if (linkUrl) {
-        builder.setLinkUrl(startIndex, endIndex, linkUrl);
-      }
-    }
-
-    richTextValues.push([builder.build()]);
-  }
-
-  range.setRichTextValues(richTextValues);
-}
-
 /**
  * This function is passed the B/O and I/O sheets and it sets the hyperlinks from those sheets to P/O sheet.
  * 
@@ -1146,17 +1064,24 @@ function hyperlinkOrderNumbers() {
  */
 function establishItemLinks_PO(spreadsheet, ...sheets)
 {
-  const poSheet = spreadsheet.getSheetByName('P/O')
-  poSheet?.getFilter()?.remove(); // Remove the filter
+  const   poSheet = spreadsheet.getSheetByName('P/O')
+  const recdSheet = spreadsheet.getSheetByName("Rec'd")
+    poSheet?.getFilter()?.remove(); // Remove the filter
+  recdSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-  const poSheet_NumRows = poSheet.getLastRow() - 1
-  poSheet.getRange(2, 1, poSheet_NumRows, poSheet.getLastColumn()).createFilter().sort(10, true); // Create a filter in the header and sort by the purchase order number
+  const   poSheet_NumRowsPlusHeader =   poSheet.getLastRow() - 1;
+  const recdSheet_NumRowsPlusHeader = recdSheet.getLastRow() - 1;
+  const   poSheet_NumRows =   poSheet_NumRowsPlusHeader - 1;
+  const recdSheet_NumRows = recdSheet_NumRowsPlusHeader - 1;
+    poSheet.getRange(2, 1,   poSheet_NumRowsPlusHeader,   poSheet.getLastColumn()).createFilter().sort(10, true); // Create a filter in the header and sort by the purchase order number
+  recdSheet.getRange(2, 1, recdSheet_NumRowsPlusHeader, recdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the receipt number
   SpreadsheetApp.flush();
 
-  const purchaseOrderNumbersAndSku_PO = (poSheet_NumRows > 1) ? poSheet.getSheetValues(3, 5, poSheet_NumRows - 1, 6) : null;
+  const purchaseOrderNumbersAndSku_PO = (  poSheet_NumRows > 0) ?   poSheet.getSheetValues(3, 5,   poSheet_NumRows, 6) : null;
+  const     receiptNumbersAndSku_RECD = (recdSheet_NumRows > 0) ? recdSheet.getSheetValues(3, 6, recdSheet_NumRows, 7) : null;
   const poSheetId = poSheet.getSheetId()
-  var numRows, skus, notesRange, purchaseOrderNumbers, poNumber, startIndex, endIndex, row;
+  var numRows, skus, notesRange, purchaseOrderNumbers, poNumber, startIndex, endIndex, row_PO, receipt;
 
   sheets.map(sheet => {
 
@@ -1171,17 +1096,25 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
 
         notes = noteValues[0].getText();
         isPoNumInNotes = notes.match(/PO0\d{5}/); // match 5-digit number
-        poNumber = '', row = -1;
+        poNumber = '', row_PO = -1, receipt = null;
         
         if (isPoNumInNotes)
         {
           poNumber = isPoNumInNotes[0];
           startIndex = notes.indexOf(poNumber);
           endIndex = startIndex + poNumber.length;
-          row = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
+          row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
+          // receipt  = (row_PO <= 2) ? (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.find(rect => rect[5] === poNumber && rect[0] === skus[sku][0]) : null : null;
+
+          // Logger.log(receipt)
+
+          // if (receipt)
+          // {
+
+          // }
         }
 
-        return (row > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + poSheetId + '&range=A' + row + ':M' + row).build()] : noteValues;
+        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + poSheetId + '&range=A' + row_PO + ':M' + row_PO).build()] : noteValues;
       })
 
       notesRange.setRichTextValues(purchaseOrderNumbers);
@@ -1726,14 +1659,6 @@ function setColumnWidths()
 function setItemLinks(lodgeOrdersSheet, spreadsheet)
 {
   spreadsheet.toast('Order and Invoice # hyperlinks being established...', '', -1)
-
-  const recdSheet = spreadsheet.getSheetByName("Rec'd")
-  recdSheet?.getFilter()?.remove(); // Remove the filter
-  SpreadsheetApp.flush();
-
-  recdSheet.getRange(2, 1, recdSheet.getLastRow() - 1, recdSheet.getLastColumn()).createFilter().sort(12, true); // Create a filter in the header and sort by the receipt number
-  SpreadsheetApp.flush();
-
   establishItemLinks_IO_BO(spreadsheet,                              lodgeOrdersSheet, spreadsheet.getSheetByName('GUIDE ORDERS'))
   establishItemLinks_INVD( spreadsheet, spreadsheet.getSheetByName('LODGE COMPLETED'), spreadsheet.getSheetByName('GUIDE COMPLETED'))
   establishItemLinks_PO(   spreadsheet, spreadsheet.getSheetByName('I/O'),             spreadsheet.getSheetByName('B/O'))
@@ -1938,7 +1863,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
 
   if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
   {
-    var newItems = items.filter(item => item[isItemCompleteIdx] ).filter(item => item[backOrderQtyIdx]).map(item => {
+    var newItems = items.filter(item => item[isItemCompleteIdx] ).filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment').map(item => {
         return [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
           removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
     });
