@@ -987,7 +987,7 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const orderNumbersAndSku_IO = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows, 6) : null;
   const boSheetId = boSheet.getSheetId()
   const ioSheetId = ioSheet.getSheetId()
-  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, row_io, row_bo;
+  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, notes;
 
   sheets.map(sheet => {
 
@@ -1019,7 +1019,7 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
   if (poSheet_NumRows > 0)
   {
-    skus = poSheet.getSheetValues(3, 5, poSheet_NumRows, 1)
+    const skus = poSheet.getSheetValues(3, 5, poSheet_NumRows, 1)
     range = poSheet.getRange(3, 11, poSheet_NumRows, 1)
 
     orderNumbers = range.getRichTextValues().map((noteValues, sku) => {
@@ -1080,8 +1080,9 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
 
   const purchaseOrderNumbersAndSku_PO = (  poSheet_NumRows > 0) ?   poSheet.getSheetValues(3, 5,   poSheet_NumRows, 6) : null;
   const     receiptNumbersAndSku_RECD = (recdSheet_NumRows > 0) ? recdSheet.getSheetValues(3, 6, recdSheet_NumRows, 7) : null;
-  const poSheetId = poSheet.getSheetId()
-  var numRows, skus, notesRange, purchaseOrderNumbers, poNumber, startIndex, endIndex, row_PO, receipt;
+  const   poSheetId =   poSheet.getSheetId()
+  const recdSheetId = recdSheet.getSheetId()
+  var numRows, skus, notesRange, purchaseOrderNumbers, notes, isPoNumInNotes, poNumber, startIndex, endIndex, row_PO, isReceiptNumInNotes, receiptNumber, row_RECD, idx_RECD, endOfPoNum;
 
   sheets.map(sheet => {
 
@@ -1091,12 +1092,18 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
     {
       skus = sheet.getSheetValues(3,  6, numRows, 1)
       notesRange = sheet.getRange(3, 12, numRows, 1)
+      
+      Logger.log(skus)
 
       purchaseOrderNumbers = notesRange.getRichTextValues().map((noteValues, sku) => {
 
         notes = noteValues[0].getText();
         isPoNumInNotes = notes.match(/PO0\d{5}/); // match 5-digit number
-        poNumber = '', row_PO = -1, receipt = null;
+        poNumber = '', row_PO = -1, row_RECD = -1;
+
+        Logger.log(sku + '. ----------------------------------')
+        Logger.log('notes: ' + notes)
+        Logger.log('isPoNumInNotes: ' + isPoNumInNotes)
         
         if (isPoNumInNotes)
         {
@@ -1104,17 +1111,48 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
           startIndex = notes.indexOf(poNumber);
           endIndex = startIndex + poNumber.length;
           row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
-          // receipt  = (row_PO <= 2) ? (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.find(rect => rect[5] === poNumber && rect[0] === skus[sku][0]) : null : null;
+          isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
 
-          // Logger.log(receipt)
+          Logger.log('notes: ' + notes)
+          Logger.log('isPoNumInNotes: ' + isPoNumInNotes)
+          Logger.log('poNumber: ' + poNumber)
+          Logger.log('isReceiptNumInNotes: ' + isReceiptNumInNotes)
 
-          // if (receipt)
-          // {
+          if (isReceiptNumInNotes) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
+          {
+            receiptNumber = isReceiptNumInNotes[0];
+            startIndex = notes.indexOf(receiptNumber);
+            endIndex = startIndex + receiptNumber.length;
+            row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] === receiptNumber && rct[0] === skus[sku][0]) + 3 : -1;
 
-          // }
+            Logger.log('receiptNumber: ' + receiptNumber)
+            Logger.log('startIndex: ' + startIndex)
+            Logger.log('endIndex: ' + endIndex)
+            Logger.log('row_RECD: ' + row_RECD)
+            
+          }
+          else if (row_PO <= 2) // There is no receipt number and the PO number is not found on the P/O sheet, therefore check if the item is on the Rec'd sheet
+          {
+            idx_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[5] === poNumber && rct[0] === skus[sku][0]) : -1;
+
+            if (idx_RECD !== -1) // The item was found on the Rec'd page using the PO number, therefore add the RC number to the notes and hyperlink it
+            {
+              receiptNumber = receiptNumbersAndSku_RECD[idx_RECD][6];
+              endOfPoNum = startIndex + poNumber.length;
+              endIndex = endOfPoNum + receiptNumber.length + 1;
+              row_RECD = idx_RECD + 3;
+              
+              return [noteValues[0].copy()
+                        .setText(notes.slice(0, endOfPoNum) + (" " + receiptNumber) + notes.slice(endOfPoNum))
+                        .setLinkUrl(endOfPoNum + 1, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()];
+            }
+          }
         }
+        else
+          Logger.log('No PO number in the notes... (row_PO > 2): ' + (row_PO > 2) + ' (row_RECD > 2): ' + (row_RECD > 2))
 
-        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + poSheetId + '&range=A' + row_PO + ':M' + row_PO).build()] : noteValues;
+        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':M' + row_PO  ).build()] : 
+             (row_RECD > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()] : noteValues;
       })
 
       notesRange.setRichTextValues(purchaseOrderNumbers);
