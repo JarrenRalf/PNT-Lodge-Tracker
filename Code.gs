@@ -14,8 +14,8 @@ function onChange(e)
     var spreadsheet = e.source;
     var sheets = spreadsheet.getSheets();
     var info, numRows = 0, numCols = 1, maxRow = 2, maxCol = 3, isAdagioOE = 4, isAdagioPO = 5, 
-    isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, 
-    isInvoicedItems = 10, isCreditedItems = 11, nRows = 0, nCols = 0;
+      isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, 
+      isInvoicedItems = 10, isCreditedItems = 11, nRows = 0, nCols = 0;
 
     for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
     {
@@ -970,24 +970,28 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const   boSheet = spreadsheet.getSheetByName('B/O')
   const   ioSheet = spreadsheet.getSheetByName('I/O')
   const   poSheet = spreadsheet.getSheetByName('P/O')
+  const invdSheet = spreadsheet.getSheetByName("Inv'd")
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
-  const boSheet_NumRowsPlusHeader = boSheet.getLastRow() - 1;
-  const ioSheet_NumRowsPlusHeader = ioSheet.getLastRow() - 1;
-  const boSheet_NumRows = boSheet_NumRowsPlusHeader - 1;
-  const ioSheet_NumRows = ioSheet_NumRowsPlusHeader - 1;
-  const poSheet_NumRows = poSheet.getLastRow() - 2;
+  const   boSheet_NumRowsPlusHeader = boSheet.getLastRow() - 1;
+  const   ioSheet_NumRowsPlusHeader = ioSheet.getLastRow() - 1;
+  const   boSheet_NumRows =   boSheet_NumRowsPlusHeader - 1;
+  const   ioSheet_NumRows =   ioSheet_NumRowsPlusHeader - 1;
+  const   poSheet_NumRows =   poSheet.getLastRow() - 2;
+  const invdSheet_NumRows = invdSheet.getLastRow() - 2;
     boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader ,   boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
     ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader ,   ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
   
-  const orderNumbersAndSku_BO = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 6, boSheet_NumRows, 6) : null;
-  const orderNumbersAndSku_IO = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 6, ioSheet_NumRows, 6) : null;
-  const boSheetId = boSheet.getSheetId()
-  const ioSheetId = ioSheet.getSheetId()
-  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, notes;
+  const orderNumbersAndSku_BO   = (  boSheet_NumRows > 0) ?   boSheet.getSheetValues(3, 6,   boSheet_NumRows, 6) : null;
+  const orderNumbersAndSku_IO   = (  ioSheet_NumRows > 0) ?   ioSheet.getSheetValues(3, 6,   ioSheet_NumRows, 6) : null;
+  const orderNumbersAndSku_INVD = (invdSheet_NumRows > 0) ? invdSheet.getSheetValues(3, 6, invdSheet_NumRows, 6) : null;
+  const   boSheetId =   boSheet.getSheetId();
+  const   ioSheetId =   ioSheet.getSheetId();
+  const invdSheetId = invdSheet.getSheetId();
+  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, row_invd, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, notes;
 
   sheets.map(sheet => {
 
@@ -1035,15 +1039,18 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
           orderNumber = ordNum[0];
           startIndex = notes.indexOf(orderNumber);
           endIndex = startIndex + orderNumber.length;
-          row_bo = (orderNumbersAndSku_BO) ? orderNumbersAndSku_BO.findIndex(ord => ord[5] === orderNumber && ord[0] === skus[sku][0]) + 3 : -1;
-          row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] === orderNumber && ord[0] === skus[sku][0]) + 3 : -1;
+          row_bo   = (orderNumbersAndSku_BO)   ?   orderNumbersAndSku_BO.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
+          row_io   = (orderNumbersAndSku_IO)   ?   orderNumbersAndSku_IO.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
+          row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
 
           if (row_bo > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + boSheetId + '&range=A' + row_bo + ':N' + row_bo)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':N' + row_bo)
           else if (row_io > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + ioSheetId + '&range=A' + row_io + ':N' + row_io)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':N' + row_io)
+          else if (row_invd > 2)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + row_invd)
+              .setTextStyle(startIndex, endIndex, SpreadsheetApp.newTextStyle().setForegroundColor('#b45f06').setUnderline(true).build())
         })
-
 
         return [richTextBuilder.build()];
       }
@@ -1092,18 +1099,12 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
     {
       skus = sheet.getSheetValues(3,  6, numRows, 1)
       notesRange = sheet.getRange(3, 12, numRows, 1)
-      
-      Logger.log(skus)
 
       purchaseOrderNumbers = notesRange.getRichTextValues().map((noteValues, sku) => {
 
         notes = noteValues[0].getText();
         isPoNumInNotes = notes.match(/PO0\d{5}/); // match 5-digit number
         poNumber = '', row_PO = -1, row_RECD = -1;
-
-        Logger.log(sku + '. ----------------------------------')
-        Logger.log('notes: ' + notes)
-        Logger.log('isPoNumInNotes: ' + isPoNumInNotes)
         
         if (isPoNumInNotes)
         {
@@ -1113,23 +1114,12 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
           row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
           isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
 
-          Logger.log('notes: ' + notes)
-          Logger.log('isPoNumInNotes: ' + isPoNumInNotes)
-          Logger.log('poNumber: ' + poNumber)
-          Logger.log('isReceiptNumInNotes: ' + isReceiptNumInNotes)
-
           if (isReceiptNumInNotes) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
           {
             receiptNumber = isReceiptNumInNotes[0];
             startIndex = notes.indexOf(receiptNumber);
             endIndex = startIndex + receiptNumber.length;
             row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] === receiptNumber && rct[0] === skus[sku][0]) + 3 : -1;
-
-            Logger.log('receiptNumber: ' + receiptNumber)
-            Logger.log('startIndex: ' + startIndex)
-            Logger.log('endIndex: ' + endIndex)
-            Logger.log('row_RECD: ' + row_RECD)
-            
           }
           else if (row_PO <= 2) // There is no receipt number and the PO number is not found on the P/O sheet, therefore check if the item is on the Rec'd sheet
           {
@@ -1148,8 +1138,6 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
             }
           }
         }
-        else
-          Logger.log('No PO number in the notes... (row_PO > 2): ' + (row_PO > 2) + ' (row_RECD > 2): ' + (row_RECD > 2))
 
         return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':M' + row_PO  ).build()] : 
              (row_RECD > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()] : noteValues;
