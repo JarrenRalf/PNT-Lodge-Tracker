@@ -135,6 +135,7 @@ function installedOnOpen(e)
   const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
   const areTriggersCreated = spreadsheet.getSheetByName('Triggers').getRange(1, 1).isChecked();
   const currentTransferSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(" ").shift();
+  var guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet;
 
   if (!isBlank(newSpreadsheetUrl))
   {
@@ -149,7 +150,8 @@ function installedOnOpen(e)
   // else
   //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
-  setItemLinks(lodgeOrdersSheet, spreadsheet)
+  [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
+  //setTransferSheetLinks(lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet)
 }
 
 /**
@@ -900,13 +902,12 @@ function emailCostChangeOfLeadOrFrozenBait()
 /**
  * This function is passed the completed sheets and it sets the hyperlinks from those sheets to the Inv'd page.
  * 
- * @param {Spreadsheet} spreadsheet : The active spreadsheet.
- * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two completed sheets
+ * @param {Sheet}  invdSheet : The sheet with invoiced items on it
+ * @param {Sheet[]} sheets   : An array of sheets, assumed to be the two completed sheets
  * @author Jarren Ralf 
  */
-function establishItemLinks_INVD(spreadsheet, ...sheets)
+function establishItemLinks_INVD(invdSheet, ...sheets)
 {
-  const invdSheet = spreadsheet.getSheetByName("Inv'd")
   invdSheet?.getFilter()?.remove(); // Remove the filter
   SpreadsheetApp.flush();
 
@@ -930,7 +931,7 @@ function establishItemLinks_INVD(spreadsheet, ...sheets)
         invoiceNumber = rowVals[1].getText();
         notes = rowVals[0].getText();
         isCreditNumInNotes = notes.match(/\d{5}/); // match 5-digit number
-        row_invd = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(inv => inv[0] === invoiceNumber && isBlank(inv[1])) + 3 : -1;
+        row_invd = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(inv => inv[0] == invoiceNumber && isBlank(inv[1])) + 3 : -1;
         row_cred = -1, creditNumber = '';
 
         if (isCreditNumInNotes)
@@ -938,17 +939,17 @@ function establishItemLinks_INVD(spreadsheet, ...sheets)
           creditNumber = isCreditNumInNotes[0];
           startIndex = notes.indexOf(creditNumber);
           endIndex = startIndex + creditNumber.length;
-          row_cred = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(cred => cred[1] === creditNumber) + 3 : -1;
+          row_cred = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(cred => cred[1] == creditNumber) + 3 : -1;
         }
 
         return (row_invd > 2 && row_cred > 2) ? 
-            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] === creditNumber) + 3)).build(),
-             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] === invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
+            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] == creditNumber) + 3)).build(),
+             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] == invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
           (row_invd > 2) ? 
             [rowVals[0],
-             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] === invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
+             rowVals[1].copy().setLinkUrl('#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(inv  => inv[0] == invoiceNumber && isBlank(inv[1])) + 3)).build()] : 
           (row_cred > 2) ? 
-            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] === creditNumber) + 3)).build(),
+            [rowVals[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_cred + ':M' + (invoiceAndCreditNumbers_Invd.findLastIndex(cred => cred[1] == creditNumber) + 3)).build(),
              rowVals[1]] :
           rowVals;
       })
@@ -963,6 +964,7 @@ function establishItemLinks_INVD(spreadsheet, ...sheets)
  * 
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two order sheets
+ * @return {Sheet[]} Returns the bo, io, po, and invd sheets.
  * @author Jarren Ralf 
  */
 function establishItemLinks_IO_BO(spreadsheet, ...sheets)
@@ -981,8 +983,8 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const   ioSheet_NumRows =   ioSheet_NumRowsPlusHeader - 1;
   const   poSheet_NumRows =   poSheet.getLastRow() - 2;
   const invdSheet_NumRows = invdSheet.getLastRow() - 2;
-    boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader ,   boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
-    ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader ,   ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+    boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+    ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
   
   const orderNumbersAndSku_BO   = (  boSheet_NumRows > 0) ?   boSheet.getSheetValues(3, 6,   boSheet_NumRows, 6) : null;
@@ -1003,15 +1005,15 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
       orderNumbers = range.getRichTextValues().map(ordNum => {
         orderNumber = ordNum[0].getText();
-        row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] === orderNumber) + 3 : -1;
+        row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] == orderNumber) + 3 : -1;
 
         if (row_io > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] === orderNumber) + 3)).build()]      
+          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()]      
         else if (orderNumbersAndSku_BO) // Make sure there are back order items on the list
         {
-          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] === orderNumber) + 3;
+          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] == orderNumber) + 3;
         
-          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] === orderNumber) + 3)).build()] : ordNum;
+          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()] : ordNum;
         }
         else 
           return ordNum;
@@ -1060,18 +1062,20 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
     range.setRichTextValues(orderNumbers); 
   }
+
+  return [boSheet, ioSheet, poSheet, invdSheet]
 }
 
 /**
  * This function is passed the B/O and I/O sheets and it sets the hyperlinks from those sheets to P/O sheet.
  * 
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {Sheet}         poSheet   : The sheet with purchase order items on it
  * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two item sheet, B/O and I/O
  * @author Jarren Ralf 
  */
-function establishItemLinks_PO(spreadsheet, ...sheets)
+function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
 {
-  const   poSheet = spreadsheet.getSheetByName('P/O')
   const recdSheet = spreadsheet.getSheetByName("Rec'd")
     poSheet?.getFilter()?.remove(); // Remove the filter
   recdSheet?.getFilter()?.remove(); // Remove the filter
@@ -1111,7 +1115,7 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
           poNumber = isPoNumInNotes[0];
           startIndex = notes.indexOf(poNumber);
           endIndex = startIndex + poNumber.length;
-          row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] === poNumber && po[0] === skus[sku][0]) + 3 : -1;
+          row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] == poNumber && po[0] == skus[sku][0]) + 3 : -1;
           isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
 
           if (isReceiptNumInNotes) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
@@ -1119,11 +1123,11 @@ function establishItemLinks_PO(spreadsheet, ...sheets)
             receiptNumber = isReceiptNumInNotes[0];
             startIndex = notes.indexOf(receiptNumber);
             endIndex = startIndex + receiptNumber.length;
-            row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] === receiptNumber && rct[0] === skus[sku][0]) + 3 : -1;
+            row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == receiptNumber && rct[0] == skus[sku][0]) + 3 : -1;
           }
           else if (row_PO <= 2) // There is no receipt number and the PO number is not found on the P/O sheet, therefore check if the item is on the Rec'd sheet
           {
-            idx_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[5] === poNumber && rct[0] === skus[sku][0]) : -1;
+            idx_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[5] == poNumber && rct[0] == skus[sku][0]) : -1;
 
             if (idx_RECD !== -1) // The item was found on the Rec'd page using the PO number, therefore add the RC number to the notes and hyperlink it
             {
@@ -1680,15 +1684,54 @@ function setColumnWidths()
  * 
  * @param {Sheet}  lodgeOrdersSheet : The LODGE ORDERS sheet.
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @return {Sheet[]} Returns the Guide Orders, Lodge Completed, and Guide Completed sheets.
  * @author Jarren Ralf 
  */
 function setItemLinks(lodgeOrdersSheet, spreadsheet)
 {
   spreadsheet.toast('Order and Invoice # hyperlinks being established...', '', -1)
-  establishItemLinks_IO_BO(spreadsheet,                              lodgeOrdersSheet, spreadsheet.getSheetByName('GUIDE ORDERS'))
-  establishItemLinks_INVD( spreadsheet, spreadsheet.getSheetByName('LODGE COMPLETED'), spreadsheet.getSheetByName('GUIDE COMPLETED'))
-  establishItemLinks_PO(   spreadsheet, spreadsheet.getSheetByName('I/O'),             spreadsheet.getSheetByName('B/O'))
+  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
+  const lodgeCompletedSheet = spreadsheet.getSheetByName('LODGE COMPLETED');
+  const guideCompletedSheet = spreadsheet.getSheetByName('GUIDE COMPLETED');
+
+  [boSheet, ioSheet, poSheet, invdSheet] = establishItemLinks_IO_BO(spreadsheet, lodgeOrdersSheet, guideOrdersSheet)
+  establishItemLinks_INVD(invdSheet, lodgeCompletedSheet, guideCompletedSheet)
+  establishItemLinks_PO(spreadsheet, poSheet, ioSheet, boSheet)
   spreadsheet.toast('Order and Invoice # hyperlinks completed.', '')
+
+  return [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet]
+}
+
+/**
+ * This function takes all of the hyper links to the transfer sheets and it updates the urls for the transfer sheets.
+ * 
+ * @param {Sheet[]} sheets : An array of sheets, assumed to be the two order sheets and completed sheets.
+ * @author Jarren Ralf 
+ */
+function setTransferSheetLinks(...sheets)
+{
+  spreadsheet.toast('Transfer sheet hyperlinks being established...', '', -1)
+
+  var numRows, range, notes, note;
+
+  sheets.map(sheet => {
+
+    numRows = sheet.getLastRow() - 2;
+
+    if (numRows > 0)
+    {
+      range = sheet.getRange(3, 10, numRows, 1)
+      
+      notes = range.getRichTextValues().map(noteVals => {
+        note = noteVals[0].getText();
+        
+      })
+
+      range.setRichTextValues(notes);
+    }
+  })
+
+  spreadsheet.toast('Transfer sheet hyperlinks completed.', '', -1)
 }
 
 /**
@@ -1792,7 +1835,6 @@ function updateInvoicedItemsOnTracker(items, spreadsheet, invNum, isCreditedItem
       [invoiceDate, customerName, '', -1*item[returnedQtyIdx], '', 
       removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], item[extendedunitPriceIdx], 
       locationName , orderNumber, invoiceNumber, creditNumber])
-   
   }
   else
   {
