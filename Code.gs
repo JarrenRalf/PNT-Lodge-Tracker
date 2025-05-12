@@ -2379,9 +2379,34 @@ function updatePoItemsOnTracker(items, spreadsheet)
   const vendorName = items[0][headerOE.indexOf('Vendor name')];
   const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
 
-  const newItems = items.map(item => [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
+  const reuploadSheet = spreadsheet.getSheetByName('Reupload:' + purchaseOrderNumber);
+
+  if (reuploadSheet)
+  {
+    const reuploadNotes = reuploadSheet.getSheetValues(2, 1, reuploadSheet.getLastRow() - 1, 5);
+    var noteValues;
+
+    var newItems = items.map(item => {
+
+      noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx]));
+
+      return (noteValues) ? 
+          [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+            item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName, purchaseOrderNumber, 
+            noteValues[1], noteValues[3], noteValues[4]] : 
+        [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+          item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName, purchaseOrderNumber, '', '', '']
+
+    }).filter(item => item[3] !== 0 || item[4] === ' '); // Remove items that have already been received, as well as keep comments / notes
+
+    spreadsheet.deleteSheet(reuploadSheet)
+  }
+  else
+  {
+    var newItems = items.map(item => [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
       removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
-  ).filter(item => item[2] !== 0 || item[3] !== 0 || isBlank(item[4])); // Remove items that have already been received, as well as keep comments / notes
+    ).filter(item => item[3] !== 0 || item[4] === ' '); // Remove items that have already been received, as well as keep comments / notes
+  }
 
   const poItemSheet = spreadsheet.getSheetByName('P/O').activate(); 
   const numRows = poItemSheet.getLastRow() - 2;
@@ -2619,12 +2644,12 @@ function updatePriceAndCostOfLeadAndFrozenBait()
 
     if (discountValues)
     {
-      item[11] = Number(discountValues[1]);                                                    // Base Price
-      item[12] = Number(discountValues[2])/100;                                                // Guide Percent
+      item[11] =  Number(discountValues[1]);                                                   // Base Price
+      item[12] =  Number(discountValues[2])/100;                                               // Guide Percent
       item[13] = (Number(discountValues[1])*(100 - Number(discountValues[2]))/100).toFixed(2); // Guide Price
-      item[14] = Number(discountValues[3])/100;                                                // Lodge Percent
+      item[14] =  Number(discountValues[3])/100;                                               // Lodge Percent
       item[15] = (Number(discountValues[1])*(100 - Number(discountValues[3]))/100).toFixed(2); // Lodge Price
-      item[16] = Number(discountValues[4])/100;                                                // Wholesale Percent
+      item[16] =  Number(discountValues[4])/100;                                               // Wholesale Percent
       item[17] = (Number(discountValues[1])*(100 - Number(discountValues[4]))/100).toFixed(2); // Wholesale Price
     }
 
@@ -2648,7 +2673,7 @@ function updatePriceAndCostOfLeadAndFrozenBait()
         baitSheet.showColumns(5, 2);
       }
 
-      item[8] = itemValues[cost]; // Adagio Cost
+      item[ 8] = itemValues[cost]; // Adagio Cost
       item[10] = Number(item[11])/Number(itemValues[cost]) // Markup %
     }
 
@@ -2677,6 +2702,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const dateIdx = headerOE.indexOf('Order Date');
   const poNumberIdx = headerOE.indexOf('Document');
   const poStatusIdx = headerOE.indexOf('Automatic Style Code');
+  const totalValueIdx = headerOE.indexOf('Total Value');
   const poItemsSheet = spreadsheet.getSheetByName('P/O')
   const numItemsOnPos = poItemsSheet.getLastRow() - 2;
   const numCols_PoItems = poItemsSheet.getLastColumn();
@@ -2690,7 +2716,8 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const currentYear = new Date().getFullYear().toString();
   const lastYear = new Date().getFullYear().toString();
   const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
-  var numPOsAdded = 0, numPOsRemoved = 0, itemManagement_Po_Idx = -1, itemManagement_NonLodgePo_Idx = -1;
+  const templateSheet = spreadsheet.getSheetByName('Reupload:');
+  var numPOsAdded = 0, numPOsRemoved = 0, itemManagement_Po_Idx = -1, itemManagement_NonLodgePo_Idx = -1, isThisPoNumberRemovedFromItemsSheet, reuploadSheet;
 
   if (lodgeSheetYear === (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
@@ -2706,8 +2733,8 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
       || (isCurrentLodgeSeasonYear && allPurchaseOrders[i][dateIdx].toString().substring(6).toString() === currentYear)))
     {
       Logger.log('PO Number: ' + allPurchaseOrders[i][poNumberIdx])
-      Logger.log('Status: ' + allPurchaseOrders[i][poStatusIdx])
-      
+      Logger.log('PO Status: ' + allPurchaseOrders[i][poStatusIdx])
+
       if (allPurchaseOrders[i][poStatusIdx] !== 'PO Completed')
       {
         if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx]) && !itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
@@ -2716,10 +2743,30 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
           itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
           numPOsAdded++;
         }
+        else if (allPurchaseOrders[i][poStatusIdx]  === 'PO Part Received' && allPurchaseOrders[i][totalValueIdx] != 0 && 
+          !(Math.round((poItems.filter(poNum => poNum[9] == allPurchaseOrders[i][poNumberIdx]).map(amount => Number(amount[7])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % 
+          Number(allPurchaseOrders[i][totalValueIdx]) === 0)) 
+        {
+          Logger.log('This PO is partially received: ' + allPurchaseOrders[i][poNumberIdx] + '. The items on this order need to be imported again.')
+
+          reuploadSheet = spreadsheet.insertSheet('Reupload:' + allPurchaseOrders[i][poNumberIdx], {template: templateSheet}).hideSheet();
+
+          poItems = poItems.filter(poNum => {
+
+            isThisPoNumberRemovedFromItemsSheet = poNum[9] !== allPurchaseOrders[i][poNumberIdx];
+
+            if (!isThisPoNumberRemovedFromItemsSheet)
+              reuploadSheet.appendRow([poNum[4], poNum[10], '', poNum[11], poNum[12]]);
+
+            return isThisPoNumberRemovedFromItemsSheet
+          }); // Remove the items from the P/O page
+
+          numPOsRemoved++;
+        }
       }
       else // PO is complete
       {
-        Logger.log('This PO is complete...')
+        Logger.log('This PO is complete.')
         // Remove all lines that match this PO number from the P/O sheet
         itemManagement_Po_Idx = itemManagement_Po.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
         itemManagement_NonLodgePo_Idx = itemManagement_NonLodgePo.findIndex(poNum => poNum === allPurchaseOrders[i][poNumberIdx])
@@ -2727,14 +2774,14 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
         if (itemManagement_Po_Idx !== -1)
         {
           itemManagement_Po[itemManagement_Po_Idx] = false;
-          Logger.log('Remove this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
+          Logger.log('Remove this PO from Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
           numPOsRemoved++;
         }
 
         if (itemManagement_NonLodgePo_Idx !== -1)
         {
           itemManagement_NonLodgePo[itemManagement_NonLodgePo_Idx] = false;
-          Logger.log('Remove this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
+          Logger.log('Remove this PO from Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
           numPOsRemoved++;
         }
 
