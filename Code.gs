@@ -1,6 +1,8 @@
-/**
- * Send an automated email weekly with all of the lines from the IO / BO / PO tabs that have nothing written in the Notes column. Accompany the information with the relevant orders from the Lodge Orders page.
- */
+function deleteReuploadSheets()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  spreadsheet.getSheets().map(sheet => (sheet.getSheetName().substring(0, 10) == 'Reupload:3') ? spreadsheet.deleteSheet(sheet) : sheet)
+}
 
 /**
  * This function handles the import of an excel file by identifying the creation of a new sheet.
@@ -1928,35 +1930,112 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const enteredByAndApproval = getEnteredByNameAndApprovalStatus(orderNumber, enteredByNamesAndApprovalStatus);
   const customerName = getProperTypesetName(items[0][customerNumIdx], customerNames, 2);
   const locationName = getLocationName(items[0][locationIdx])
-
-  if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
-  {
-    var newItems = items.filter(item => item[isItemCompleteIdx] ).filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment').map(item => {
-        return [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
-          removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
-    });
-
-    var itemSheet = spreadsheet.getSheetByName('B/O').activate(); 
-  }
-  else 
-  {
-    var newItems = items.map(item => {
-        return [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], 
-          removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, '', '', ''] // Back Ordered Items
-    });
-
-    var itemSheet = spreadsheet.getSheetByName('I/O').activate(); 
-  }
-
+  const reuploadSheet = spreadsheet.getSheetByName('Reupload:' + orderNumber);
+  const itemSheet = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? spreadsheet.getSheetByName('B/O').activate() : spreadsheet.getSheetByName('I/O').activate();
   const numRows = itemSheet.getLastRow() - 2;
+  var noteValues;
+  itemSheet?.getFilter()?.remove(); // Remove the filter
+
+  if (reuploadSheet)
+  {
+    const reuploadNotes = reuploadSheet.getSheetValues(2, 1, reuploadSheet.getLastRow() - 1, 5);
+
+    var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
+                      items.filter(item => item[isItemCompleteIdx])
+                        .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                        .map(item => {
+
+                          noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+
+                          return (noteValues) ? 
+                              [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+                              item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                              noteValues[1], noteValues[2], noteValues[4]] : 
+                            [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+                            item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                            '', '', '']}) : 
+      items.map(item => { 
+
+        noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+
+        return (noteValues) ? 
+            [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+            item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+            noteValues[1], noteValues[2], noteValues[4]] :
+          [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+          item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+          '', '', '']})
+
+    spreadsheet.deleteSheet(reuploadSheet)
+  }
+  else
+  {
+    var isCurrentOrder, deletedItemsFromCurrentOrder = [];
+
+    if (numRows > 0)
+    { 
+      const ordNum = itemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Order #');
+
+      var currentItems = itemSheet.getSheetValues(3, 1, numRows, itemSheet.getLastColumn()).filter(item => {
+
+        isCurrentOrder = item[ordNum] === orderNumber;
+
+        if (isCurrentOrder)
+          deletedItemsFromCurrentOrder.push([item[5], item[11], item[12], item[13]])
+
+        return isBlank(item[ordNum]) || !isCurrentOrder;
+      });
+    }
+
+    if (deletedItemsFromCurrentOrder.length !== 0)
+    {
+      var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
+                        items.filter(item => item[isItemCompleteIdx])
+                             .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                             .map(item => {
+
+                                noteValues = deletedItemsFromCurrentOrder.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+
+                                return (noteValues) ? 
+                                    [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+                                    item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                                    noteValues[1], noteValues[2], noteValues[3]] : 
+                                  [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+                                  item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                                  '', '', '']}) : 
+        items.map(item => { 
+
+          noteValues = deletedItemsFromCurrentOrder.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+
+          return (noteValues) ? 
+              [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+              item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+              noteValues[1], noteValues[2], noteValues[3]] :
+            [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+            item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+            '', '', '']})
+    }
+    else
+    {
+      var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
+                        items.filter(item => item[isItemCompleteIdx])
+                             .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                             .map(item => 
+                                [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
+                                item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                                '', '', '']) : 
+      items.map(item => 
+        [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+        item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+        '', '', ''])
+    }
+  }
+
   const numNewItems = newItems.length;
   var numItemsRemoved = numNewItems;
-  itemSheet?.getFilter()?.remove(); // Remove the filter
 
   if (numRows > 0)
   { 
-    const ordNum = itemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Order #');
-    var currentItems = itemSheet.getSheetValues(3, 1, numRows, itemSheet.getLastColumn()).filter(item => isBlank(item[ordNum]) || item[ordNum] !== orderNumber);
     var numCurrentItems = currentItems.length;
     itemSheet.getRange(3, 1, numCurrentItems, currentItems[0].length).setValues(currentItems);
 
@@ -1973,16 +2052,16 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   {
     const numCols = newItems[0].length;
 
+    if (numRows > 0)
+      itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
+          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+        .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 11, ascending: true}]);
+    else
+      itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+        .setValues(newItems)
+
     if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
     {
-      if (numRows > 0)
-        itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-            .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
-          .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 11, ascending: true}]);
-      else
-        itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
-          .setValues(newItems)
-
       Logger.log('The following new Back Ordered items were added to the B/O tab:')
       Logger.log(newItems)
 
@@ -1990,14 +2069,6 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
     }
     else
     {
-      if (numRows > 0)
-        itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-            .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
-          .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 11, ascending: true}]);
-      else
-        itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
-          .setValues(newItems)
-
       Logger.log('The following new Ordered items were added to the I/O tab:')
       Logger.log(newItems)
 
@@ -2037,6 +2108,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const locationIdx = headerOE.indexOf('Loc');
   const customerNameIdx = headerOE.indexOf('Name');
   const employeeNameIdx = headerOE.indexOf('Created by User');
+  const orderValueIdx = headerOE.indexOf('Total Order Value');
   const isOrderCompleteIdx = headerOE.indexOf('Order Complete?');
   const invoiceDateIdx = (headerOE.indexOf('Inv Date') !== -1) ? headerOE.indexOf('Inv Date') : headerOE.indexOf('OE Invoice Date');
   const invoicedByIdx = headerOE.indexOf('OE Invoice Initials');
@@ -2296,8 +2368,103 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   else // Cancelled Orders (if ANY)
   {
     var isLodgeOrderCancelled, isCharterGuideOrderCancelled, cancelledOrders = [];
+    const templateSheet = spreadsheet.getSheetByName('Reupload:');
+    const boSheet = spreadsheet.getSheetByName('B/O')
+    const ioSheet = spreadsheet.getSheetByName('I/O')
+    const numCols = boSheet.getLastColumn()
+    const numBoItems = boSheet.getLastRow() - 2;
+    const numIoItems = ioSheet.getLastRow() - 2;
+    var boItems = (numBoItems > 0) ? boSheet.getSheetValues(3, 1, numBoItems, numCols) : null;
+    var ioItems = (numIoItems > 0) ? ioSheet.getSheetValues(3, 1, numIoItems, numCols) : null;
+    var itemsOnOrder, reuploadSheet, isThisOrdNumberRemovedFromItemsSheet, numIOsRemoved = 0, numBOsRemoved = 0;
+
     SpreadsheetApp.flush();
-    const currentOrderNumbers = allOrders.map(ord => ord[orderNumIdx]).flat().filter(ordNum => isNotBlank(ordNum)); 
+
+    Logger.log('The following orders need to be reuploaded because the Total Order Value has changed which means items may have been added or removed from the order:')
+
+    // Return a list of the current order numbers but while compiling that list, check if any orders have changed and there the B/O or I/O sheets need to have their items updated
+    const currentOrderNumbers = allOrders.map(ord => {
+
+      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      // if (ioItems)
+      // {
+      //   itemsOnOrder = ioItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+
+      //   if (itemsOnOrder)
+      //   {
+      //     if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
+      //     {
+      //       Logger.log(ord[orderNumIdx])
+      //       reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+
+      //       ioItems = ioItems.filter(ordNum => {
+
+      //         isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+
+      //         if (!isThisOrdNumberRemovedFromItemsSheet)
+      //           reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+      //         return isThisOrdNumberRemovedFromItemsSheet
+      //       }); // Remove the items from the I/O page
+
+      //       numIOsRemoved++;
+      //     }
+      //   }
+      //   else
+      //   {
+      //     itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+
+      //     if (itemsOnOrder)
+      //     {
+      //       if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
+      //       {
+      //         Logger.log(ord[orderNumIdx])
+      //         reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+
+      //         boItems = boItems.filter(ordNum => {
+
+      //           isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+
+      //           if (!isThisOrdNumberRemovedFromItemsSheet)
+      //             reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+      //           return isThisOrdNumberRemovedFromItemsSheet
+      //         }); // Remove the items from the B/O page
+
+      //         numBOsRemoved++;
+      //       }
+      //     }
+      //   }
+      // }
+      // else if (boItems)
+      // {
+      //   itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+
+      //   if (itemsOnOrder)
+      //   {
+      //     if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
+      //     {
+      //       Logger.log(ord[orderNumIdx])
+      //       reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+
+      //       boItems = boItems.filter(ordNum => {
+
+      //         isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+
+      //         if (!isThisOrdNumberRemovedFromItemsSheet)
+      //           reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+      //         return isThisOrdNumberRemovedFromItemsSheet
+      //       }); // Remove the items from the B/O page
+
+      //       numBOsRemoved++;
+      //     }
+      //   }
+      // }
+  
+      return ord[orderNumIdx]
+    }).flat().filter(ordNum => isNotBlank(ordNum)); 
+
     const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
       .filter(currentOrd => {
 
@@ -2349,6 +2516,28 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     if (numCurrentCharterGuideOrders < numCharterGuideOrders)
       charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
+
+    if (numIOsRemoved > 0)
+    {
+      const numCurrentIoItems = ioItems.length
+
+      if (numCurrentIoItems < numIoItems && numCurrentIoItems > 0)
+      {
+        ioSheet.getRange(3, 1, numCurrentIoItems, numCols).setValues(ioItems)
+        ioSheet.deleteRows(numCurrentIoItems + 3, numIoItems - numCurrentIoItems);
+      }
+    }
+
+    if (numBOsRemoved > 0)
+    {
+      const numCurrentBoItems = boItems.length
+
+      if (numCurrentBoItems < numBoItems && numCurrentBoItems > 0)
+      {
+        boSheet.getRange(3, 1, numCurrentBoItems, numCols).setValues(boItems)
+        boSheet.deleteRows(numCurrentBoItems + 3, numBoItems - numCurrentBoItems);
+      }
+    }
   }
 
   spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
@@ -2378,7 +2567,6 @@ function updatePoItemsOnTracker(items, spreadsheet)
   const locationName = getLocationName(items[0][headerOE.indexOf('Location')]);
   const vendorName = items[0][headerOE.indexOf('Vendor name')];
   const purchaseOrderNumber = items[0][headerOE.indexOf('Doc #')];
-
   const reuploadSheet = spreadsheet.getSheetByName('Reupload:' + purchaseOrderNumber);
 
   if (reuploadSheet)
@@ -2706,7 +2894,10 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const poItemsSheet = spreadsheet.getSheetByName('P/O')
   const numItemsOnPos = poItemsSheet.getLastRow() - 2;
   const numCols_PoItems = poItemsSheet.getLastColumn();
-  var poItems = poItemsSheet.getSheetValues(3, 1, numItemsOnPos, numCols_PoItems);
+
+  if (numItemsOnPos > 0)
+    var poItems = poItemsSheet.getSheetValues(3, 1, numItemsOnPos, numCols_PoItems);
+    
   const itemManagementSheet = spreadsheet.getSheetByName('Item Management (Jarren Only ;)')
   const itemManagement_NumRows = itemManagementSheet.getLastRow() - 1;
   const itemManagement_Po_Range = itemManagementSheet.getRange(2, 7, itemManagement_NumRows, 1);
@@ -2743,7 +2934,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
           itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
           numPOsAdded++;
         }
-        else if (allPurchaseOrders[i][poStatusIdx]  === 'PO Part Received' && allPurchaseOrders[i][totalValueIdx] != 0 && 
+        else if (allPurchaseOrders[i][poStatusIdx]  === 'PO Part Received' && allPurchaseOrders[i][totalValueIdx] != 0 && numItemsOnPos > 0 &&
           !(Math.round((poItems.filter(poNum => poNum[9] == allPurchaseOrders[i][poNumberIdx]).map(amount => Number(amount[7])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % 
           Number(allPurchaseOrders[i][totalValueIdx]) === 0)) 
         {
@@ -2785,7 +2976,8 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
           numPOsRemoved++;
         }
 
-        poItems = poItems.filter(poNum => poNum[9] !== allPurchaseOrders[i][poNumberIdx]); // Remove the items from the P/O page
+        if (numItemsOnPos > 0)
+          poItems = poItems.filter(poNum => poNum[9] !== allPurchaseOrders[i][poNumberIdx]); // Remove the items from the P/O page
       }
       Logger.log('-------------------------------------------')
     }
@@ -2801,13 +2993,16 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
     const itemManagement_NonLodgePo_Updated = itemManagement_NonLodgePo.filter(u => u).sort().map(v => [v]);
     itemManagement_NonLodgePo_Range.clearContent().offset(0, 0, itemManagement_NonLodgePo_Updated.length).setValues(itemManagement_NonLodgePo_Updated);
 
-    const numCurrentItems = poItems.length
-
-    if (numCurrentItems < numItemsOnPos)
+    if (numItemsOnPos > 0)
     {
-      numPoItemsRemoved = numItemsOnPos - numCurrentItems;
-      poItemsSheet.getRange(3, 1, numCurrentItems, numCols_PoItems).setValues(poItems)
-      poItemsSheet.deleteRows(numCurrentItems + 3, numPoItemsRemoved);
+      const numCurrentItems = poItems.length
+
+      if (numCurrentItems < numItemsOnPos)
+      {
+        numPoItemsRemoved = numItemsOnPos - numCurrentItems;
+        poItemsSheet.getRange(3, 1, numCurrentItems, numCols_PoItems).setValues(poItems)
+        poItemsSheet.deleteRows(numCurrentItems + 3, numPoItemsRemoved);
+      }
     }
   }
 
