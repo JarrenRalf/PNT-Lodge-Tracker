@@ -890,11 +890,7 @@ function emailCostChangeOfLeadOrFrozenBait()
   if (new Date().getDay() !== SATURDAY) // Don't send the emails on Saturday (Sunday is fine because I can address them Monday morning)
   {
     if (hasLeadCostsChanged_OnThisSS || hasLeadCostsChanged_InAdagio)
-    {
-      Logger.log('hasLeadCostsChanged_OnThisSS: ' + hasLeadCostsChanged_OnThisSS)
-      Logger.log('hasLeadCostsChanged_InAdagio: ' + hasLeadCostsChanged_InAdagio)
       sendEmail(url + '?gid=' + leadSheet.getSheetId(), "Lead Cost & Pricing")
-    }
 
     if (hasBaitCostsChanged_OnThisSS)
       sendEmail(url + '?gid=' + baitSheet.getSheetId(), "Bait Cost & Pricing")
@@ -2095,14 +2091,11 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   // Get all the indexes of the relevant headers
   const headerOE = allOrders.shift();
-  var totalIdx = headerOE.indexOf('Total Dollar Value');
-
-  if (totalIdx === -1)
-    totalIdx = headerOE.indexOf('Amount'); // The credit notes are titled with Amount and not Total Dollar Value
-
-  const isInvoicedOrders = headerOE[totalIdx];
+  const totalIdx = headerOE.indexOf('Amount');
   const custNumIdx = headerOE.indexOf('Customer');
   const dateIdx = headerOE.indexOf('Created Date');
+  const invoicedByIdx = headerOE.indexOf('OE Invoice Initials');
+  const isInvoicedOrders = invoicedByIdx !== -1;
   const orderNumIdx = isInvoicedOrders && headerOE.indexOf('Order') || headerOE.indexOf('Order #');
   const invoiceNumIdx = isInvoicedOrders && headerOE.indexOf('Invoice') || headerOE.indexOf('Inv #');  
   const locationIdx = headerOE.indexOf('Loc');
@@ -2111,7 +2104,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
   const orderValueIdx = headerOE.indexOf('Total Order Value');
   const isOrderCompleteIdx = headerOE.indexOf('Order Complete?');
   const invoiceDateIdx = (headerOE.indexOf('Inv Date') !== -1) ? headerOE.indexOf('Inv Date') : headerOE.indexOf('OE Invoice Date');
-  const invoicedByIdx = headerOE.indexOf('OE Invoice Initials');
+  
   const creditNumIdx = headerOE.indexOf('Credit');
   const creditedByIdx = headerOE.indexOf('OE Credit Note Initials');
   const creditDateIdx = (headerOE.indexOf('OE Credit Note Date') !== -1) ? headerOE.indexOf('OE Credit Note Date') : headerOE.indexOf('Credited');
@@ -2165,6 +2158,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   if (lodgeSheetYear === currentYear) // Is this the current lodge sheet?
     var isCurrentLodgeSeasonYear = true;
+
+  Logger.log('isInvoicedOrders: ' + isInvoicedOrders)
 
   const newLodgeOrders = 
     (isInvoicedOrders) ?       // If true, then the import is a set of invoiced orders
@@ -2390,6 +2385,10 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       // {
       //   itemsOnOrder = ioItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
 
+      //   Logger.log('I/O')
+      //   Logger.log('itemsOnOrder:')
+      //   Logger.log(itemsOnOrder)
+
       //   if (itemsOnOrder)
       //   {
       //     if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
@@ -2413,6 +2412,10 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       //   else
       //   {
       //     itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+
+      //     Logger.log('B/O')
+      //     Logger.log('itemsOnOrder:')
+      //     Logger.log(itemsOnOrder)
 
       //     if (itemsOnOrder)
       //     {
