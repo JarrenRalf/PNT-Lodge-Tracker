@@ -1,9 +1,3 @@
-function deleteReuploadSheets()
-{
-  const spreadsheet = SpreadsheetApp.getActive();
-  spreadsheet.getSheets().map(sheet => (sheet.getSheetName().substring(0, 10) == 'Reupload:3') ? spreadsheet.deleteSheet(sheet) : sheet)
-}
-
 /**
  * This function handles the import of an excel file by identifying the creation of a new sheet.
  * 
@@ -1935,6 +1929,8 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   if (reuploadSheet)
   {
     const reuploadNotes = reuploadSheet.getSheetValues(2, 1, reuploadSheet.getLastRow() - 1, 5);
+    const ordNum = itemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Order #');
+    var currentItems = itemSheet.getSheetValues(3, 1, numRows, itemSheet.getLastColumn()).filter(item => isBlank(item[ordNum]) || !isCurrentOrder)
 
     var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                       items.filter(item => item[isItemCompleteIdx])
@@ -2041,8 +2037,6 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
       itemSheet.deleteRows(numCurrentItems + 3, numItemsRemoved);
     }
   }
-
-  Logger.log('Order Number: ' + orderNumber)
 
   if (numNewItems > 0)
   {
@@ -2158,8 +2152,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
   if (lodgeSheetYear === currentYear) // Is this the current lodge sheet?
     var isCurrentLodgeSeasonYear = true;
-
-  Logger.log('isInvoicedOrders: ' + isInvoicedOrders)
 
   const newLodgeOrders = 
     (isInvoicedOrders) ?       // If true, then the import is a set of invoiced orders
@@ -2371,99 +2363,89 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     const numIoItems = ioSheet.getLastRow() - 2;
     var boItems = (numBoItems > 0) ? boSheet.getSheetValues(3, 1, numBoItems, numCols) : null;
     var ioItems = (numIoItems > 0) ? ioSheet.getSheetValues(3, 1, numIoItems, numCols) : null;
-    var itemsOnOrder, reuploadSheet, isThisOrdNumberRemovedFromItemsSheet, numIOsRemoved = 0, numBOsRemoved = 0;
+    var itemsOnOrder = [], reuploadSheet, isThisOrdNumberRemovedFromItemsSheet, numIOsRemoved = 0, numBOsRemoved = 0;
 
     SpreadsheetApp.flush();
 
-    Logger.log('The following orders need to be reuploaded because the Total Order Value has changed which means items may have been added or removed from the order:')
+    //Logger.log('The following orders need to be reuploaded because the Total Order Value has changed which means items may have been added or removed from the order:')
 
     // Return a list of the current order numbers but while compiling that list, check if any orders have changed and there the B/O or I/O sheets need to have their items updated
     const currentOrderNumbers = allOrders.map(ord => {
 
-      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      // if (ioItems)
-      // {
-      //   itemsOnOrder = ioItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+      if (lodgeOrders.includes(ord[orderNumIdx].toString().trim()) || charterGuideOrders.includes(ord[orderNumIdx].toString().trim())) // Check for current orders
+      {
+        if (ioItems)
+        {
+          itemsOnOrder = ioItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
 
-      //   Logger.log('I/O')
-      //   Logger.log('itemsOnOrder:')
-      //   Logger.log(itemsOnOrder)
+          if (itemsOnOrder.length !== 0)
+          {
+            if (Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
+            {
+              Logger.log(Number(ord[orderValueIdx]))
+              reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-      //   if (itemsOnOrder)
-      //   {
-      //     if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
-      //     {
-      //       Logger.log(ord[orderNumIdx])
-      //       reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+              ioItems = ioItems.filter(ordNum => {
 
-      //       ioItems = ioItems.filter(ordNum => {
+                isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-      //         isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+                if (!isThisOrdNumberRemovedFromItemsSheet)
+                  reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
 
-      //         if (!isThisOrdNumberRemovedFromItemsSheet)
-      //           reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+                return isThisOrdNumberRemovedFromItemsSheet
+              }); // Remove the items from the I/O page
 
-      //         return isThisOrdNumberRemovedFromItemsSheet
-      //       }); // Remove the items from the I/O page
+              numIOsRemoved++;
+            }
+          }
+          else
+          {
+            itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
 
-      //       numIOsRemoved++;
-      //     }
-      //   }
-      //   else
-      //   {
-      //     itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+            if (itemsOnOrder.length !== 0 && Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
+            {
+              Logger.log(Number(ord[orderValueIdx]))
+              reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-      //     Logger.log('B/O')
-      //     Logger.log('itemsOnOrder:')
-      //     Logger.log(itemsOnOrder)
+              boItems = boItems.filter(ordNum => {
 
-      //     if (itemsOnOrder)
-      //     {
-      //       if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
-      //       {
-      //         Logger.log(ord[orderNumIdx])
-      //         reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+                isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-      //         boItems = boItems.filter(ordNum => {
+                if (!isThisOrdNumberRemovedFromItemsSheet)
+                  reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
 
-      //           isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+                return isThisOrdNumberRemovedFromItemsSheet
+              }); // Remove the items from the B/O page
 
-      //           if (!isThisOrdNumberRemovedFromItemsSheet)
-      //             reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+              numBOsRemoved++;
+            }
+          }
+        }
+        else if (boItems)
+        {
+          itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
 
-      //           return isThisOrdNumberRemovedFromItemsSheet
-      //         }); // Remove the items from the B/O page
+          if (itemsOnOrder.length !== 0 && Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
+          {
+            Logger.log(Number(ord[orderValueIdx]))
+            reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-      //         numBOsRemoved++;
-      //       }
-      //     }
-      //   }
-      // }
-      // else if (boItems)
-      // {
-      //   itemsOnOrder = boItems.filter(ordNum => ordNum[10] == ord[orderNumIdx]);
+            boItems = boItems.filter(ordNum => {
 
-      //   if (itemsOnOrder)
-      //   {
-      //     if ((Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]) === 0))
-      //     {
-      //       Logger.log(ord[orderNumIdx])
-      //       reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
+              isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-      //       boItems = boItems.filter(ordNum => {
+              if (!isThisOrdNumberRemovedFromItemsSheet)
+                reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
 
-      //         isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+              return isThisOrdNumberRemovedFromItemsSheet
+            }); // Remove the items from the B/O page
 
-      //         if (!isThisOrdNumberRemovedFromItemsSheet)
-      //           reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+            numBOsRemoved++;
+          }
+        }
 
-      //         return isThisOrdNumberRemovedFromItemsSheet
-      //       }); // Remove the items from the B/O page
-
-      //       numBOsRemoved++;
-      //     }
-      //   }
-      // }
+        itemsOnOrder.length = 0;
+      }
   
       return ord[orderNumIdx]
     }).flat().filter(ordNum => isNotBlank(ordNum)); 
@@ -2543,7 +2525,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     }
   }
 
-  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added\n ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
 }
 
 /**
