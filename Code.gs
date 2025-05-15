@@ -1145,37 +1145,59 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
 }
 
 /**
- * This function gets the chart data
+ * This function accesses the invoice data from the Lodge, Charter, and Guide Data spreadsheet and extrats the last eight years of information. 
+ * With that info if produces a chart of cummulative sales week-to-week for each year.
  * 
  * @author Jarren Ralf
  */
 function getChartData()
 {
-  const spreadsheet = SpreadsheetApp.getActive()
-  const allDataSheet = spreadsheet.getSheetByName('All Data')
-  const chartDataSheet = spreadsheet.getSheetByName('Copy of Chart Data')
-  const numRows = allDataSheet.getLastRow() - 1;
-  const allData = allDataSheet.getSheetValues(2, 1, numRows, 2);
-  const chartData = new Array(53).fill(new Array(8).fill(0))
-  Logger.log(chartData)
-  const firstDayOfYear = {
-    2018: new Date(2018, 0, 1).getTime(),
-    2019: new Date(2019, 0, 1).getTime(),
-    2020: new Date(2020, 0, 1).getTime(),
-    2021: new Date(2021, 0, 1).getTime(),
-    2022: new Date(2022, 0, 1).getTime(),
-    2023: new Date(2023, 0, 1).getTime(),
-    2024: new Date(2024, 0, 1).getTime(),
-    2025: new Date(2025, 0, 1).getTime()
-  }
-  var year;
+  const   currentYear = new Date().getFullYear();
+  const      lastYear =   currentYear - 1;
+  const   twoYearsAgo =      lastYear - 1;
+  const threeYearsAgo =   twoYearsAgo - 1;
+  const  fourYearsAgo = threeYearsAgo - 1;
+  const  fiveYearsAgo =  fourYearsAgo - 1;
+  const   sixYearsAgo =  fiveYearsAgo - 1;
+  const sevenYearsAgo =   sixYearsAgo - 1; 
+  const invoiceDataSheet = SpreadsheetApp.openById('1xKw4GAtNbAsTEodCDmCMbPCbXUlK9OHv0rt5gYzqx9c').getSheetByName('All Data');
+  const millisecondsInWeek = 7 * 24 * 60 * 60 * 1000;
+  var chartData = [], lastWeek = 0;
 
-  for (var i = numRows - 1; i >= 0; i--)
-  {
-    year = allData[i][0].getFullYear();
-    chartData[Math.floor((allData[i][0] - firstDayOfYear[year])/604800000)][2025 - year] += allData[i][1]
+  const firstDayOfYear = {
+      [currentYear]: new Date(  currentYear, 0, 1).getTime(),
+         [lastYear]: new Date(     lastYear, 0, 1).getTime(),
+      [twoYearsAgo]: new Date(  twoYearsAgo, 0, 1).getTime(),
+    [threeYearsAgo]: new Date(threeYearsAgo, 0, 1).getTime(),
+     [fourYearsAgo]: new Date( fourYearsAgo, 0, 1).getTime(),
+     [fiveYearsAgo]: new Date( fiveYearsAgo, 0, 1).getTime(),
+      [sixYearsAgo]: new Date(  sixYearsAgo, 0, 1).getTime(),
+    [sevenYearsAgo]: new Date(sevenYearsAgo, 0, 1).getTime()
   }
-  Logger.log(chartData)
+
+  for (var i = 0; i < 53; i++)
+    chartData.push(new Array(8).fill(0))
+
+  // Gather the chart data from the invoice data
+  invoiceDataSheet.getSheetValues(2, 3, invoiceDataSheet.getLastRow() - 1, 6).filter(date =>  date[0].getFullYear() >= sevenYearsAgo)
+    .map(amount => chartData[Math.ceil((amount[0] - firstDayOfYear[amount[0].getFullYear()]) / millisecondsInWeek)][currentYear - amount[0].getFullYear()] += Number(amount[5]))
+
+  // Convert the data into cumulative data
+  chartData = chartData.map((amount, week, cumulativeData) => {
+
+    if (week > 0)
+    {
+      lastWeek = week - 1;
+
+      for (var i = 0; i < 8; i++)
+        amount[i] += (amount[i] === 0 && i == 0) ? 0 : Number(cumulativeData[lastWeek][i]);
+    }
+
+    return ["Week " + (week + 1), ...amount]
+  })
+
+  const numRows = chartData.unshift(["", currentYear, lastYear, twoYearsAgo, threeYearsAgo, fourYearsAgo, fiveYearsAgo, sixYearsAgo, sevenYearsAgo]);
+  SpreadsheetApp.getActive().getSheetByName('Chart Data').getRange(1, 1, numRows, chartData[0].length).setValues(chartData)
 }
 
 /**
@@ -1749,6 +1771,7 @@ function triggers_CreateAll()
   const spreadsheet = SpreadsheetApp.getActive()
   ScriptApp.newTrigger('onChange').forSpreadsheet(spreadsheet). onChange().create();
   ScriptApp.newTrigger('installedOnOpen').forSpreadsheet(spreadsheet).onOpen().create();
+  ScriptApp.newTrigger('getChartData').timeBased().atHour(9).everyDays(1).create();
   ScriptApp.newTrigger('setColumnWidths').timeBased().atHour(7).everyDays(1).create();
   ScriptApp.newTrigger('updatedPntReceivingSpreadsheet').timeBased().atHour(20).everyDays(1).create(); 
   ScriptApp.newTrigger('updatePriceAndCostOfLeadAndFrozenBait').timeBased().atHour(7).everyDays(1).create();
