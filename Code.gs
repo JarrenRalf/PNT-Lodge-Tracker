@@ -147,7 +147,7 @@ function installedOnOpen(e)
   //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
   [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
-  //setTransferSheetLinks(lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet)
+  setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet)
 }
 
 /**
@@ -753,18 +753,23 @@ function createNewLodgeTracker()
 /**
  * This function finds items with on the B/O tab that matches the given order number and deletes them.
  * 
- * @param {String || String[][]} orderNumber : The order number of the current order being updated on the ORDERS page.
- * @param     {Spreadsheet}      spreadsheet : The active spreadsheet
+ * @param {String || String[][]} orderNumber       : The order number of the current order being updated on the ORDERS page.
+ * @param {Spreadsheet}          spreadsheet       : The active spreadsheet
+ * @param {String[][]} listOfOrderCompletionStatus : A list of order numbers paired with either "Yes" for fully complete and "No" otherwise
  * @author Jarren Ralf
  */
-function deleteBackOrderedItems(orderNumber, spreadsheet)
+function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionStatus)
 {
+  const templateSheet = spreadsheet.getSheetByName('Reupload:');
   const boSheet = spreadsheet.getSheetByName('B/O');
   const ioSheet = spreadsheet.getSheetByName('I/O');
   const boSheet_NumRows = boSheet.getLastRow() - 2;
   const ioSheet_NumRows = ioSheet.getLastRow() - 2;
   const boSheet_NumCols = boSheet.getLastColumn();
   const ioSheet_NumCols = ioSheet.getLastColumn();
+  const boItems = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 1, boSheet_NumRows, boSheet_NumCols) : null;
+  const ioItems = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 1, ioSheet_NumRows, ioSheet_NumCols) : null;
+  
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove();
   boSheet.getRange(2, 1, boSheet_NumRows + 1, boSheet_NumCols).createFilter().sort(11, true)
@@ -773,41 +778,105 @@ function deleteBackOrderedItems(orderNumber, spreadsheet)
 
   if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
   {
-    var orderNumbers, row, numRows;
+    var isLodgeOrderComplete, itemsOnOrder, row, numRows;
 
-    orderNumber.map(ordNum => {
+    if (listOfOrderCompletionStatus)
+    {
+      orderNumber.map(ordNum => {
 
-      if (!isBlank(ordNum[2]))
-      {
-        // Back Orders Sheet
-        if (boSheet_NumRows > 0)
+        if (!isBlank(ordNum[2]))
         {
-          orderNumbers = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
-          row = orderNumbers.findIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]);
+          isLodgeOrderComplete = listOfOrderCompletionStatus.find(partialOrd => partialOrd[0] === ordNum[2])
 
-          if (row !== -1)
+          if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
           {
-            numRows = orderNumbers.findLastIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]) - row + 1;
-            boSheet.deleteRows(row + 3, numRows);
-            SpreadsheetApp.flush();
+            if (ioItems)
+            {
+              row = ioItems.findIndex(ordNum_IO => ordNum_IO[10] == ordNum[2]);
+
+              if (row !== -1)
+              {
+                numRows = ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2]) - row + 1;
+                itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                  .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                ioSheet.deleteRows(row + 3, numRows);
+                SpreadsheetApp.flush();
+              }
+              else
+              {
+                row = boItems.findIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]);
+
+                if (row !== -1)
+                {
+                  numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
+                  itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                  spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                  boSheet.deleteRows(row + 3, numRows);
+                  SpreadsheetApp.flush();
+                }
+              }
+            }
+            else if (boItems)
+            {
+              row = boItems.findIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]);
+
+              if (row !== -1)
+              {
+                numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
+                itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                  .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                boSheet.deleteRows(row + 3, numRows);
+                SpreadsheetApp.flush();
+              }
+            }
+
+            itemsOnOrder.length = 0;
           }
         }
+      })
+    }
+    else
+    {
+      orderNumber.map(ordNum => {
 
-        // Inital Orders Sheet
-        if (ioSheet_NumRows > 0)
+        if (!isBlank(ordNum[2]))
         {
-          orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
-          row = orderNumbers.findIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]);
-
-          if (row !== -1)
+          // Back Orders Sheet
+          if (boSheet_NumRows > 0)
           {
-            numRows = orderNumbers.findLastIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]) - row + 1;
-            ioSheet.deleteRows(row + 3, numRows);
-            SpreadsheetApp.flush();
+            orderNumbers = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
+            row = orderNumbers.findIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]);
+
+            if (row !== -1)
+            {
+              numRows = orderNumbers.findLastIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]) - row + 1;
+              boSheet.deleteRows(row + 3, numRows);
+              SpreadsheetApp.flush();
+            }
+          }
+
+          // Inital Orders Sheet
+          if (ioSheet_NumRows > 0)
+          {
+            orderNumbers = ioSheet.getSheetValues(3, 11, ioSheet_NumRows, 1);
+            row = orderNumbers.findIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]);
+
+            if (row !== -1)
+            {
+              numRows = orderNumbers.findLastIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]) - row + 1;
+              ioSheet.deleteRows(row + 3, numRows);
+              SpreadsheetApp.flush();
+            }
           }
         }
-      }
-    })
+      })
+    }
   }
   else
   {
@@ -1719,14 +1788,15 @@ function setItemLinks(lodgeOrdersSheet, spreadsheet)
 /**
  * This function takes all of the hyper links to the transfer sheets and it updates the urls for the transfer sheets.
  * 
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @param {Sheet[]} sheets : An array of sheets, assumed to be the two order sheets and completed sheets.
  * @author Jarren Ralf 
  */
-function setTransferSheetLinks(...sheets)
+function setTransferSheetLinks(spreadsheet, ...sheets)
 {
-  spreadsheet.toast('Transfer sheet hyperlinks being established...', '', -1)
+  //spreadsheet.toast('Transfer sheet hyperlinks being established...', '', -1)
 
-  var numRows, range, notes, note;
+  var numRows, range, notes, note, noteLength = 0, numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink = [], richTextBuilder, locations;
 
   sheets.map(sheet => {
 
@@ -1735,17 +1805,75 @@ function setTransferSheetLinks(...sheets)
     if (numRows > 0)
     {
       range = sheet.getRange(3, 10, numRows, 1)
+      orderNumbers = sheet.getSheetValues(3, 3, numRows, 1)
       
-      notes = range.getRichTextValues().map(noteVals => {
-        note = noteVals[0].getText();
+      notes = range.getRichTextValues().map((richText, ordNum) => {
+        note = richText[0].getText();
         
+        if (note.includes("Shipping from"))
+        {
+          numLinksToParksille   = 1;
+          numLinksToRupert      = 1;
+          numLinksFromParksille = 1;
+          numLinksFromRupert    = 1;
+          rangeLink.length      = 0;
+          noteLength            = 0;
+          richTextBuilder = richText[0].copy();
+
+          note.split('\n').map(run => {
+
+            if (run.includes("Shipping from "))
+            {
+              locations = run.split("Shipping from ").pop().split(' to ');
+
+              switch (locations[0])
+              {
+                case "Richmond": 
+                  break;
+                case "Parksville":
+                  var ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
+                  var itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
+                  var gid = itemsToRichmondSheet.getSheetId();
+
+                  itemsToRichmondSheet.getSheetValues(4, 2, itemsToRichmondSheet.getLastRow() - 3, 3)
+                    .map((description, row) => (description[0].includes(orderNumbers[ordNum][0])) ? rangeLink.push('&range=B' + (row + 4)) : null)
+
+                  if (rangeLink.length > 0)
+                  {
+                    for (var i = 1; i < numLinksFromParksille; i++)
+                      rangeLink.pop()
+
+                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, ss.getUrl() + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                  }
+
+                  numLinksFromParksille++;
+                  break;
+                case "Rupert":
+
+                  var itemsToRichmondSheet = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c').getSheetByName('ItemsToRichmond');
+                  var itemsToRichmond = itemsToRichmondSheet.getSheetValues(4, 2, itemsToRichmondSheet.getLastRow() - 3, 3);
+
+                  numLinksFromRupert++;
+                  break;
+              }
+            }
+
+            noteLength += run.length + 1;
+          })
+
+          Logger.log('-------------------------------------------------------------------------------------')
+          
+          // return [richTextBuilder.build()];
+        }
+
+        // return richText
       })
 
-      range.setRichTextValues(notes);
+      //range.setRichTextValues(notes);
     }
   })
 
-  spreadsheet.toast('Transfer sheet hyperlinks completed.', '', -1)
+  // spreadsheet.toast('Transfer sheet hyperlinks completed.', '', -1)
 }
 
 /**
@@ -2253,7 +2381,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     Logger.log('The following new Lodge orders were added to the tracker:')
     Logger.log(newLodgeOrders)
 
-    deleteBackOrderedItems(newLodgeOrders, spreadsheet);
+    deleteBackOrderedItems(newLodgeOrders, spreadsheet, lodgePartiallyCompleteOrders);
   }
   else
     var lodgePartiallyCompleteOrders = [];
@@ -2281,7 +2409,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     Logger.log('The following new Charter and Guide orders were added to the tracker:')
     Logger.log(newCharterGuideOrders)
 
-    deleteBackOrderedItems(newCharterGuideOrders, spreadsheet);
+    deleteBackOrderedItems(newCharterGuideOrders, spreadsheet, charterGuidePartiallyCompleteOrders);
   }
   else
     var charterGuidePartiallyCompleteOrders = []
@@ -2296,24 +2424,26 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     {
       const completedLodgeOrderNumbers = lodgeCompletedSheet.getSheetValues(3, 3, lodgeCompletedSheet.getLastRow() - 2, 12)
         .filter(ord => ord[11] === 'Completed')
-        .map(ord => ord[0]).flat()
+        .map(ord => ord[0].toString()).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order'); 
 
-      Logger.log('completedLodgeOrderNumbers: ' + completedLodgeOrderNumbers)
-      Logger.log('lodgePartiallyCompleteOrders: ' + lodgePartiallyCompleteOrders)
+      Logger.log('completedLodgeOrderNumbers:')
+      Logger.log(completedLodgeOrderNumbers)
+      Logger.log('lodgePartiallyCompleteOrders:')
+      Logger.log(lodgePartiallyCompleteOrders)
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
 
-          isLodgeOrderComplete = lodgePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
+        isLodgeOrderComplete = lodgePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
 
-          if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
-          {
-            currentOrd[10] = 'multiple';
-            currentOrd[13] = 'Partial Order';
-          }
+        if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
+        {
+          currentOrd[10] = 'multiple';
+          currentOrd[13] = 'Partial Order';
+        }
 
-          return currentOrd;
+        return currentOrd;
 
         }).filter(currentOrd => {
 
@@ -2323,7 +2453,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
             Logger.log(currentOrd);
           
           return !isLodgeOrderComplete;
-        });
+      });
 
       var numCurrentLodgeOrders = currentLodgeOrders.length;
 
@@ -2339,21 +2469,21 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     {
       const completedCharterGuideOrderNumbers = charterGuideCompletedSheet.getSheetValues(3, 3, charterGuideCompletedSheet.getLastRow() - 2, 12)
         .filter(ord => ord[11] === 'Completed')
-        .map(ord => ord[2]).flat()
+        .map(ord => ord[0].toString()).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order');
 
       Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14).map(currentOrd => {
         
-          isCharterGuideOrderComplete = charterGuidePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
+        isCharterGuideOrderComplete = charterGuidePartiallyCompleteOrders.find(partialOrd => partialOrd[0] === currentOrd[2])
 
-          if (isCharterGuideOrderComplete && isCharterGuideOrderComplete[1] === 'No')
-          {
-            currentOrd[10] = 'multiple';
-            currentOrd[13] = 'Partial Order';
-          }
+        if (isCharterGuideOrderComplete && isCharterGuideOrderComplete[1] === 'No')
+        {
+          currentOrd[10] = 'multiple';
+          currentOrd[13] = 'Partial Order';
+        }
 
-          return currentOrd;
+        return currentOrd;
 
         }).filter(currentOrd => {
 
@@ -2390,9 +2520,9 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
     SpreadsheetApp.flush();
 
-    //Logger.log('The following orders need to be reuploaded because the Total Order Value has changed which means items may have been added or removed from the order:')
+    Logger.log('The following orders need to be reuploaded because the Total Order Value has changed which means items may have been added or removed from the order:')
 
-    // Return a list of the current order numbers but while compiling that list, check if any orders have changed and there the B/O or I/O sheets need to have their items updated
+    // Return a list of the current order numbers but while compiling that list, check if any orders have changed and the B/O or I/O sheets need to have their items updated
     const currentOrderNumbers = allOrders.map(ord => {
 
       if (lodgeOrders.includes(ord[orderNumIdx].toString().trim()) || charterGuideOrders.includes(ord[orderNumIdx].toString().trim())) // Check for current orders
@@ -2405,7 +2535,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           {
             if (Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
             {
-              Logger.log(Number(ord[orderValueIdx]))
+              Logger.log(Number(ord[orderNumIdx]))
               reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
               ioItems = ioItems.filter(ordNum => {
@@ -2427,7 +2557,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
 
             if (itemsOnOrder.length !== 0 && Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
             {
-              Logger.log(Number(ord[orderValueIdx]))
+              Logger.log(Number(ord[orderNumIdx]))
               reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
               boItems = boItems.filter(ordNum => {
