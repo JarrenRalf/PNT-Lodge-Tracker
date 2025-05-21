@@ -1221,6 +1221,7 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
  */
 function getChartData()
 {
+  const spreadsheet = SpreadsheetApp.getActive();
   const   currentYear = new Date().getFullYear();
   const      lastYear =   currentYear - 1;
   const   twoYearsAgo =      lastYear - 1;
@@ -1230,8 +1231,11 @@ function getChartData()
   const   sixYearsAgo =  fiveYearsAgo - 1;
   const sevenYearsAgo =   sixYearsAgo - 1; 
   const invoiceDataSheet = SpreadsheetApp.openById('1xKw4GAtNbAsTEodCDmCMbPCbXUlK9OHv0rt5gYzqx9c').getSheetByName('All Data');
+  const dashboard = spreadsheet.getSheetByName('Dashboard')
+  const ioAmount = Number(dashboard.getSheetValues(14, 9, 1, 1)[0][0]);
+  const boAmount = Number(dashboard.getSheetValues(12, 9, 1, 1)[0][0]) + ioAmount;
   const millisecondsInWeek = 7 * 24 * 60 * 60 * 1000;
-  var chartData = [], lastWeek = 0;
+  var chartData = [], lastWeek = 0, currentSales = 0;
 
   const firstDayOfYear = {
       [currentYear]: new Date(  currentYear, 0, 1).getTime(),
@@ -1262,11 +1266,13 @@ function getChartData()
         amount[i] += (amount[i] === 0 && i == 0) ? 0 : Number(cumulativeData[lastWeek][i]);
     }
 
-    return ["Week " + (week + 1), ...amount]
-  })
+    currentSales = (currentSales < amount[0]) ? amount[0] : currentSales;
 
-  const numRows = chartData.unshift(["", currentYear, lastYear, twoYearsAgo, threeYearsAgo, fourYearsAgo, fiveYearsAgo, sixYearsAgo, sevenYearsAgo]);
-  SpreadsheetApp.getActive().getSheetByName('Chart Data').getRange(1, 1, numRows, chartData[0].length).setValues(chartData)
+    return ["Week " + (week + 1), ...amount]
+  }).map(potentialSales => {potentialSales.push(currentSales + ioAmount, currentSales + boAmount); return potentialSales})
+
+  const numRows = chartData.unshift(["", currentYear, lastYear, twoYearsAgo, threeYearsAgo, fourYearsAgo, fiveYearsAgo, sixYearsAgo, sevenYearsAgo, "I/O", "B/O"]);
+  spreadsheet.getSheetByName('Chart Data').getRange(1, 1, numRows, chartData[0].length).setValues(chartData)
 }
 
 /**
