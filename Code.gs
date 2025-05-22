@@ -308,7 +308,7 @@ function addItemsToTransferSheet()
             textResponse = response.getResponseText().toUpperCase();
 
             if (textResponse == 'PARKS')
-              toLocation = 'Parskville'
+              toLocation = 'Parksville'
             else if (textResponse == 'PR')
               toLocation = 'Rupert'
             else
@@ -339,7 +339,7 @@ function addItemsToTransferSheet()
 
           switch (toLocation)
           {
-            case 'Parskville':
+            case 'Parksville':
               url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
               sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
               itemValues = items.map((v,idx) => [today, 'Lodge\nTracker', qty[idx], v[0], v[1], 'ATTN: Jesse (Lodge Items)\n' + name[idx] + '\nORD# ' + ordNum[idx], v[3], '']) 
@@ -511,7 +511,7 @@ function addOrdersToTransferSheet()
           textResponse = response.getResponseText().toUpperCase();
 
           if (textResponse == 'PARKS')
-            toLocation = 'Parskville'
+            toLocation = 'Parksville'
           else if (textResponse == 'PR')
             toLocation = 'Rupert'
           else
@@ -542,7 +542,7 @@ function addOrdersToTransferSheet()
 
         switch (toLocation)
         {
-          case 'Parskville':
+          case 'Parksville':
             url = 'https://docs.google.com/spreadsheets/d/181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM/edit?gid=1340095049#gid=1340095049'
             sheet = SpreadsheetApp.openByUrl(url).getSheetByName('Order')
             itemValues = values.map(value => 
@@ -1786,7 +1786,7 @@ function setItemLinks(lodgeOrdersSheet, spreadsheet)
   [boSheet, ioSheet, poSheet, invdSheet] = establishItemLinks_IO_BO(spreadsheet, lodgeOrdersSheet, guideOrdersSheet)
   establishItemLinks_INVD(invdSheet, lodgeCompletedSheet, guideCompletedSheet)
   establishItemLinks_PO(spreadsheet, poSheet, ioSheet, boSheet)
-  spreadsheet.toast('Order and Invoice # hyperlinks completed.', '')
+  spreadsheet.toast('Transfer sheet hyperlinks being established...', 'Order and Invoice # hyperlinks completed.', -1)
 
   return [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet]
 }
@@ -1800,9 +1800,8 @@ function setItemLinks(lodgeOrdersSheet, spreadsheet)
  */
 function setTransferSheetLinks(spreadsheet, ...sheets)
 {
-  //spreadsheet.toast('Transfer sheet hyperlinks being established...', '', -1)
-
-  var numRows, range, notes, note, noteLength = 0, numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink = [], richTextBuilder, locations;
+  var numRows, range, notesRange, orderNumbers, invoiceNumbers, note, noteLength = 0, numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, 
+    numLinksFromRupert = 1, rangeLink = [], richTextBuilder, locations, ss, url, itemsToRichmondSheet, orderSheet, shippedSheet, receivedSheet, gid;
 
   sheets.map(sheet => {
 
@@ -1810,23 +1809,25 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
 
     if (numRows > 0)
     {
-      range = sheet.getRange(3, 10, numRows, 1)
+      notesRange = sheet.getRange(3, 10, numRows, 1)
       orderNumbers = sheet.getSheetValues(3, 3, numRows, 1)
+      invoiceNumbers = sheet.getSheetValues(3, 11, numRows, 1)
       
-      notes = range.getRichTextValues().map((richText, ordNum) => {
+      notes = notesRange.getRichTextValues().map((richText, ordNum) => {
         note = richText[0].getText();
         
         if (note.includes("Shipping from"))
         {
-          numLinksToParksille   = 1;
-          numLinksToRupert      = 1;
-          numLinksFromParksille = 1;
-          numLinksFromRupert    = 1;
-          rangeLink.length      = 0;
-          noteLength            = 0;
-          richTextBuilder = richText[0].copy();
+          Logger.log('note:\n\n' + note)
+          Logger.log('Order Number: ' + orderNumbers[ordNum][0])
+          Logger.log('Invoice Number: ' + invoiceNumbers[ordNum][0])
 
-          note.split('\n').map(run => {
+          numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink.length = 0, noteLength = 0;
+          richTextBuilder = SpreadsheetApp.newRichTextValue().setText(note);
+
+          Logger.log('Number of Newlines within the note: ' + note.split('\n').length)
+
+          richText = note.split('\n').map(run => {
 
             if (run.includes("Shipping from "))
             {
@@ -1835,29 +1836,138 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
               switch (locations[0])
               {
                 case "Richmond": 
+
+                  switch (locations[1])
+                  {
+                    case "Parksville":
+                      ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
+                         orderSheet = ss.getSheetByName('Order');
+                       shippedSheet = ss.getSheetByName('Shipped');
+                      receivedSheet = ss.getSheetByName('Received');
+                      url = ss.getUrl();
+
+                      gid = orderSheet.getSheetId()
+                      orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                        .map((description, row) => 
+                          (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                      gid = shippedSheet.getSheetId()
+                      shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                        .map((description, row) => 
+                          (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                      
+                      gid = receivedSheet.getSheetId()
+                      receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
+                        .map((description, row) => {
+
+                          if (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0]) || description[0].includes('Order# ' + orderNumbers[ordNum][0]))
+                            Logger.log(description[0]);
+
+                          return (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null})
+
+                      Logger.log('rangeLink.length: ' + rangeLink.length)
+
+                      if (rangeLink.length > 0)
+                      {
+                        for (var i = 1; i < numLinksToParksille; i++)
+                          rangeLink.pop()
+
+                        Logger.log('url: ' + rangeLink[rangeLink.length - 1])
+                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                      }
+
+                      numLinksToParksille++;
+                      break;
+                    case "Rupert":
+                      ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
+                         orderSheet = ss.getSheetByName('Order');
+                       shippedSheet = ss.getSheetByName('Shipped');
+                      receivedSheet = ss.getSheetByName('Received');
+                      url = ss.getUrl();
+
+                      gid = orderSheet.getSheetId()
+                      orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                        .map((description, row) => 
+                          (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                      gid = shippedSheet.getSheetId()
+                      shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                        .map((description, row) => 
+                          (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+              
+                      gid = receivedSheet.getSheetId()
+                      receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
+                        .map((description, row) => {
+
+                          if (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0]) || description[0].includes('Order# ' + orderNumbers[ordNum][0]))
+                            Logger.log(description[0]);
+
+                          return (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                          (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null})
+
+                      Logger.log('rangeLink.length: ' + rangeLink.length)
+
+                      if (rangeLink.length > 0)
+                      {
+                        for (var i = 1; i < numLinksToRupert; i++)
+                          rangeLink.pop()
+
+                        Logger.log('url: ' + rangeLink[rangeLink.length - 1])
+                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                      }
+
+                      numLinksToRupert++;
+                      break;
+                  }
                   break;
                 case "Parksville":
-                  var ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
-                  var itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
-                  var gid = itemsToRichmondSheet.getSheetId();
+                  ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
+                  itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
+                  gid = itemsToRichmondSheet.getSheetId();
 
-                  itemsToRichmondSheet.getSheetValues(4, 2, itemsToRichmondSheet.getLastRow() - 3, 3)
-                    .map((description, row) => (description[0].includes(orderNumbers[ordNum][0])) ? rangeLink.push('&range=B' + (row + 4)) : null)
+                  itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
+                    .map((description, row) => 
+                      (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                      (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                  Logger.log('rangeLink.length: ' + rangeLink.length)
 
                   if (rangeLink.length > 0)
                   {
                     for (var i = 1; i < numLinksFromParksille; i++)
                       rangeLink.pop()
 
-                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, ss.getUrl() + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                    Logger.log('url: ' + rangeLink[rangeLink.length - 1])
+                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                   }
 
                   numLinksFromParksille++;
                   break;
                 case "Rupert":
+                  ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
+                  itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
+                  gid = itemsToRichmondSheet.getSheetId();
 
-                  var itemsToRichmondSheet = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c').getSheetByName('ItemsToRichmond');
-                  var itemsToRichmond = itemsToRichmondSheet.getSheetValues(4, 2, itemsToRichmondSheet.getLastRow() - 3, 3);
+                  itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
+                    .map((description, row) => 
+                      (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : 
+                      (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                  Logger.log('rangeLink.length: ' + rangeLink.length)
+
+                  if (rangeLink.length > 0)
+                  {
+                    for (var i = 1; i < numLinksFromRupert; i++)
+                      rangeLink.pop()
+
+                    Logger.log('url: ' + rangeLink[rangeLink.length - 1])
+                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                  }
 
                   numLinksFromRupert++;
                   break;
@@ -1867,19 +1977,19 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
             noteLength += run.length + 1;
           })
 
-          Logger.log('-------------------------------------------------------------------------------------')
+          Logger.log('----------------------------------------------------------------------------------------------------------------------------------------')
           
-          // return [richTextBuilder.build()];
+          return [richTextBuilder.build()];
         }
 
-        // return richText
+        return richText
       })
 
-      //range.setRichTextValues(notes);
+      //notesRange.setRichTextValues(notes);
     }
   })
 
-  // spreadsheet.toast('Transfer sheet hyperlinks completed.', '', -1)
+  spreadsheet.toast('', 'Transfer sheet hyperlinks completed.', -1)
 }
 
 /**
