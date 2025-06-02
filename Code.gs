@@ -147,98 +147,7 @@ function installedOnOpen(e)
   //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
   [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
-  setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet)
-}
-
-/**
- * 
- */
-function sendAnEmailToSelectedPeopleAskingIfOrderIsApproved()
-{
-  const spreadsheet = SpreadsheetApp.getActive();
-  const activeSheet = spreadsheet.getActiveSheet();
-  const sheetName = activeSheet.getSheetName().split(" ");
-  const numCols = activeSheet.getLastColumn();
-  // const emails = {   'Brent': 'brent@pacificnetandtwine.com', 
-  //                  'Derrick': 'dmizuyabu@pacificnetandtwine.com',
-  //                    'Deryk': 'deryk@pacificnetandtwine.com',
-  //                   'Jarren': 'jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com',
-  //                     'Kris': 'kris@pacificnetandtwine.com',
-  //                     'Nate': '',
-  //                     'Noah': '',
-  //                 'Scarlett': '',
-  //                    'Scott': 'scottnakashima@hotmail.com',
-  //                    'Endis': 'triteswarehouse@pacificnetandtwine.com',
-  //                     'Eryn': 'eryn@pacificnetandtwine.com'}
-  const emails = {   'Brent': 'lb_blitz_allstar@hotmail.com', 
-                   'Derrick': 'lb_blitz_allstar@hotmail.com',
-                     'Deryk': 'lb_blitz_allstar@hotmail.com',
-                    'Jarren': 'lb_blitz_allstar@hotmail.com',
-                      'Kris': 'lb_blitz_allstar@hotmail.com',
-                      'Nate': '',
-                      'Noah': '',
-                  'Scarlett': '',
-                     'Scott': 'lb_blitz_allstar@hotmail.com',
-                     'Endis': 'lb_blitz_allstar@hotmail.com',
-                      'Eryn': 'lb_blitz_allstar@hotmail.com'}
-  var idx = -1, emailRecipients = [], emailBodies = [];
-
-  if (sheetName.pop() === 'ORDERS')
-  {
-    spreadsheet.getActiveRangeList().getRanges().map(rng => {
-      rng.offset(0, 1 - rng.getColumn(), rng.getNumRows(), numCols).getValues().map(order => {
-        if (order[3]) // If this order is already approved, then ignore it
-          return null;
-        else // Order is not approved
-        {
-          if (emailRecipients.includes(order[1])) // If there is more than 1 order for a particular employee to determine the approval status of
-          {
-            idx = emailRecipients.indexOf(order[1])
-            emailBodies[idx].push(order);
-          }
-          else // This is the first instance of an employee who has an unapproved order
-          {
-            idx = emailRecipients.push(order[1]) - 1;
-            emailBodies[idx] = [order];
-          }
-        }
-      })
-    })
-
-    var htmlTemplate, htmlOutput;
-  
-    emailRecipients.map((recipient, r) => {
-
-      htmlTemplate = HtmlService.createTemplateFromFile('getApprovalStatusEmail')
-      htmlTemplate.customerType = toProper(sheetName.pop())
-      htmlOutput = htmlTemplate.evaluate();
-
-      for (var i = 0; i < emailBodies[r].length; i++)
-        htmlOutput.append(
-          '<tr style="height: 20px">'+
-          '<td class="s5" dir="ltr" style="background-color:' + backgroundColours[i][0] + '">' + 
-            Utilities.formatDate(emailBodies[r][i][0], timeZone, "dd MMM yyyy") + '</td>' +
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][1] + '</td>'+
-          '<td class="s7" dir="ltr">' + emailBodies[r][i][2] + '</td>'+
-          '<td class="s8" dir="ltr">' + emailBodies[r][i][3] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][4] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][5] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][6] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][7] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][8] + '</td>'+
-          '<td class="s6" dir="ltr">' + emailBodies[r][i][9] + '</td></tr>'
-        )
-
-      htmlOutput.append('</tbody></table></div>')
-
-      MailApp.sendEmail({
-        to: emails[recipient],
-        //cc: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
-        replyTo: "jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com",
-        subject: "Are the following orders APPROVED?",
-        htmlBody: htmlOutput.getContent(),
-    })})
-  }
+  setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet, spreadsheet.getSheetByName('B/O'),  spreadsheet.getSheetByName('I/O'))
 }
 
 /**
@@ -986,10 +895,12 @@ function establishItemLinks_INVD(invdSheet, ...sheets)
 
     if (numRows > 0)
     {
-      range = sheet.getRange(3, 10, numRows, 2)
+      range = sheet.getRange(3, 10, numRows, 2).setNumberFormat('@');
+      SpreadsheetApp.flush()
       
       notesAndinvoiceNumbers = range.getRichTextValues().map(rowVals => {
         invoiceNumber = rowVals[1].getText();
+        Logger.log(invoiceNumber)
         notes = rowVals[0].getText();
         isCreditNumInNotes = notes.match(/\d{5}/); // match 5-digit number
         row_invd = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(inv => inv[0] == invoiceNumber && isBlank(inv[1])) + 3 : -1;
@@ -1695,7 +1606,7 @@ function removeDashesFromSku(sku)
 }
 
 /**
- * This funtion sends an email to me whenever there are costs in Access that need to be updated.
+ * This function sends an email to me whenever there are costs in Access that need to be updated.
  * 
  * @author Jarren
  */
@@ -1708,31 +1619,115 @@ function sendEmail(url, sheetName)
   });
 }
 
-// /**
-//  * This funtion sends an email to me every morning that there are database problems that I should be able to address quickly.
-//  * 
-//  * @author Jarren
-//  */
-// function sendEmails_CheckApprovalOfSelectedOrders()
-// {
-//   const spreadsheet = SpreadsheetApp.getActive();
-//   const sheet = spreadsheet.getActiveSheet()
-//   const activeSheet = sheet.getSheetName();
+/**
+ * This function takes the users selection on the Orders sheet and it sents an email to the appropriate employees asking if there order/s are approved or not.
+ * 
+ * @author Jarren Ralf
+ */
+function sendAnEmailToSelectedPeopleAskingIfOrderIsApproved()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const activeSheet = spreadsheet.getActiveSheet();
+  const sheetName = activeSheet.getSheetName().split(" ");
+  const numCols = activeSheet.getLastColumn() - 4; // Only include up to the Notes column
+  const timeZone = spreadsheet.getSpreadsheetTimeZone()
+  // const emails = {   'Brent': 'brent@pacificnetandtwine.com', 
+  //                  'Derrick': 'dmizuyabu@pacificnetandtwine.com',
+  //                    'Deryk': 'deryk@pacificnetandtwine.com',
+  //                   'Jarren': 'jarren@pacificnetandtwine.com, scottnakashima@hotmail.com, deryk@pacificnetandtwine.com',
+  //                     'Kris': 'kris@pacificnetandtwine.com',
+  //                   'Nathan': 'nathan@pacificnetandtwine.com',
+  //                     'Noah': 'noah@pacificnetandtwine.com',
+  //                 'Scarlett': '',
+  //                    'Scott': 'scott@pacificnetandtwine.com',
+  //                    'Endis': 'triteswarehouse@pacificnetandtwine.com',
+  //                     'Eryn': 'eryn@pacificnetandtwine.com'}
+  const emails = {   'Brent': 'lb_blitz_allstar@hotmail.com', 
+                   'Derrick': 'lb_blitz_allstar@hotmail.com',
+                     'Deryk': 'lb_blitz_allstar@hotmail.com',
+                    'Jarren': 'lb_blitz_allstar@hotmail.com',
+                      'Kris': 'lb_blitz_allstar@hotmail.com',
+                    'Nathan': 'lb_blitz_allstar@hotmail.com',
+                      'Noah': 'lb_blitz_allstar@hotmail.com',
+                  'Scarlett': '',
+                     'Scott': 'lb_blitz_allstar@hotmail.com',
+                     'Endis': 'lb_blitz_allstar@hotmail.com',
+                      'Eryn': 'lb_blitz_allstar@hotmail.com'}
+  var idx = -1, emailRecipients = [], emailBodies = [], backgroundColours = [], col, numRows;
 
-//   if (activeSheet === 'LODGE ORDERS')
-//   {
-//     const activeRanges = sheet.getActiveRangeList().getRanges().map((rng, r) => {
-      
-//     })
+  if (sheetName.pop() === 'ORDERS')
+  {
+    spreadsheet.getActiveRangeList().getRanges().map(rng => {
 
-//   }
-//   else if (activeSheet === 'GUIDE ORDERS')
-//   {
+      col = 1 - rng.getColumn();
+      numRows = rng.getNumRows();
 
-//   }
-//   else
-//     Browser.msgBox('You can only run this function from the LODGE ORDERS or GUIDE ORDERS sheet.')
-// }
+      rng.offset(0, col, numRows, numCols).getValues().map(order => {
+        if (order[3]) // If this order is already approved, then ignore it
+          return null;
+        else // Order is not approved
+        {
+          if (emailRecipients.includes(order[1])) // If there is more than 1 order for a particular employee to determine the approval status of
+          {
+            idx = emailRecipients.indexOf(order[1])
+            emailBodies[idx].push(order);
+            backgroundColours[idx].push(rng.offset(0, col, numRows, numCols).getBackgrounds())
+          }
+          else // This is the first instance of an employee who has an unapproved order
+          {
+            idx = emailRecipients.push(order[1]) - 1;
+            emailBodies[idx] = [order];
+            backgroundColours[idx] = [rng.offset(0, col, numRows, numCols).getBackgrounds()];
+          }
+        }
+      })
+    })
+
+    var htmlTemplate, htmlOutput;
+
+    Logger.log('emailRecipients:')
+    Logger.log(emailRecipients)
+    Logger.log('emailBodies:')
+    Logger.log(emailBodies)
+  
+    emailRecipients.map((recipient, r) => {
+
+      htmlTemplate = HtmlService.createTemplateFromFile('getApprovalStatusEmail')
+      htmlTemplate.customerType = toProper(sheetName[0])
+      htmlOutput = htmlTemplate.evaluate();
+
+      for (var i = 0; i < emailBodies[r].length; i++)
+        htmlOutput.append(
+          '<tr style="height: 20px">'+
+          '<td class="s5" dir="ltr" style="background-color:' + backgroundColours[r][i][0] + '">' + 
+            Utilities.formatDate(emailBodies[r][i][0], timeZone, "dd MMM yyyy") + '</td>' +
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][1] + '</td>'+
+          '<td class="s7" dir="ltr">' + emailBodies[r][i][2] + '</td>'+
+          '<td class="s8" dir="ltr">' + emailBodies[r][i][3] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][4] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][5] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][6] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][7] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][8] + '</td>'+
+          '<td class="s6" dir="ltr">' + emailBodies[r][i][9] + '</td></tr>'
+        )
+
+      htmlOutput.append('</tbody></table></div>')
+
+      Logger.log(htmlOutput)
+
+      MailApp.sendEmail({
+        to: emails[recipient],
+        //cc: "jarren@pacificnetandtwine.com, scott@pacificnetandtwine.com, deryk@pacificnetandtwine.com",
+        replyTo: "jarren@pacificnetandtwine.com, scott@pacificnetandtwine.com, deryk@pacificnetandtwine.com",
+        subject: "Are the following orders APPROVED?",
+        htmlBody: htmlOutput.getContent(),
+      })
+    })
+  }
+  else
+    Browser.msgBox('You must be on an order page to run this function.')
+}
 
 /**
  * This function sets the column widths of 4 of the sheets on this spreadsheet, namely the Order and Completed pages.
@@ -1809,54 +1804,44 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
 
     if (numRows > 0)
     {
-      notesRange = sheet.getRange(3, 10, numRows, 1)
-      orderNumbers = sheet.getSheetValues(3, 3, numRows, 1)
-      invoiceNumbers = sheet.getSheetValues(3, 11, numRows, 1)
-      
-      notes = notesRange.getRichTextValues().map((richText, ordNum) => {
-        note = richText[0].getText();
+      if (sheet.getSheetName().charAt(1) !== '/') // Lodge Orders, Guide Order, Lodge Completed, or Guide Completed
+      {
+        notesRange = sheet.getRange(3, 10, numRows, 1)
+        orderNumbers = sheet.getSheetValues(3, 3, numRows, 1)
+        invoiceNumbers = sheet.getSheetValues(3, 11, numRows, 1)
         
-        if (note.includes("Shipping from"))
-        {
-          numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink.length = 0, noteLength = 0;
-          richTextBuilder = SpreadsheetApp.newRichTextValue().setText(note);
-          noteSplit = note.split('\n');
+        notes = notesRange.getRichTextValues().map((richText, ordNum) => {
+          note = richText[0].getText();
+          
+          if (note.includes("Shipping from"))
+          {
+            numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink.length = 0, noteLength = 0;
+            richTextBuilder = SpreadsheetApp.newRichTextValue().setText(note);
+            noteSplit = note.split('\n');
 
-          richText = noteSplit.map(run => {
+            richText = noteSplit.map(run => {
 
-            if (run.includes("Shipping from "))
-            {
-              locations = run.split("Shipping from ").pop().split(' to ');
-
-              switch (locations[0]) // From Location
+              if (run.includes("Shipping from "))
               {
-                case "Richmond": 
+                locations = run.split("Shipping from ").pop().split(' to ');
 
-                  switch (locations[1]) // To Location
-                  {
-                    case "Parksville":
-                      ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
+                switch (locations[0]) // From Location
+                {
+                  case "Richmond": 
 
-                      receivedSheet = ss.getSheetByName('Received');
-                      url = ss.getUrl();
-                      gid = receivedSheet.getSheetId()
+                    switch (locations[1]) // To Location
+                    {
+                      case "Parksville":
+                        ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
 
-                      receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
-                        .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+                        receivedSheet = ss.getSheetByName('Received');
+                        url = ss.getUrl();
+                        gid = receivedSheet.getSheetId()
 
-                      if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Received sheet
-                      {
-                        for (var i = 1; i < numLinksToParksille; i++)
-                          rangeLink.pop()
-
-                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
-                      }
-                      else
-                      {
                         receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
-                          .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+                          .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                        if (rangeLink.length > 0) // Atleast 1 order number was found on the Received sheet
+                        if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Received sheet
                         {
                           for (var i = 1; i < numLinksToParksille; i++)
                             rangeLink.pop()
@@ -1865,13 +1850,10 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                         }
                         else
                         {
-                          shippedSheet = ss.getSheetByName('Shipped');
-                          gid = shippedSheet.getSheetId()
+                          receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
+                            .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                          shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
-                            .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
-
-                          if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Shipped sheet
+                          if (rangeLink.length > 0) // Atleast 1 order number was found on the Received sheet
                           {
                             for (var i = 1; i < numLinksToParksille; i++)
                               rangeLink.pop()
@@ -1880,10 +1862,13 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                           }
                           else
                           {
-                            shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
-                              .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+                            shippedSheet = ss.getSheetByName('Shipped');
+                            gid = shippedSheet.getSheetId()
 
-                            if (rangeLink.length > 0) // Atleast 1 order number was found on the Shipped sheet
+                            shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                              .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+
+                            if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Shipped sheet
                             {
                               for (var i = 1; i < numLinksToParksille; i++)
                                 rangeLink.pop()
@@ -1892,13 +1877,10 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                             }
                             else
                             {
-                              orderSheet = ss.getSheetByName('Order');
-                              gid = orderSheet.getSheetId()
+                              shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                                .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                              orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
-                                .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
-
-                              if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Order sheet
+                              if (rangeLink.length > 0) // Atleast 1 order number was found on the Shipped sheet
                               {
                                 for (var i = 1; i < numLinksToParksille; i++)
                                   rangeLink.pop()
@@ -1907,47 +1889,50 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                               }
                               else
                               {
-                                orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
-                                  .map((description, row) => (description[0].includes('Order# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                                orderSheet = ss.getSheetByName('Order');
+                                gid = orderSheet.getSheetId()
 
-                                if (rangeLink.length > 0) // Atleast 1 order number was found on the Order sheet
+                                orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                                  .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                                if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Order sheet
                                 {
                                   for (var i = 1; i < numLinksToParksille; i++)
                                     rangeLink.pop()
 
                                   richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
-                                } 
+                                }
+                                else
+                                {
+                                  orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                                    .map((description, row) => (description[0].includes('Order# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                                  if (rangeLink.length > 0) // Atleast 1 order number was found on the Order sheet
+                                  {
+                                    for (var i = 1; i < numLinksToParksille; i++)
+                                      rangeLink.pop()
+
+                                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                  } 
+                                }
                               }
                             }
                           }
                         }
-                      }
 
-                      numLinksToParksille++;
-                      break;
-                    case "Rupert":
-                      ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
+                        numLinksToParksille++;
+                        break;
+                      case "Rupert":
+                        ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
 
-                      receivedSheet = ss.getSheetByName('Received');
-                      url = ss.getUrl();
-                      gid = receivedSheet.getSheetId()
+                        receivedSheet = ss.getSheetByName('Received');
+                        url = ss.getUrl();
+                        gid = receivedSheet.getSheetId()
 
-                      receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
-                        .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
-
-                      if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Received sheet
-                      {
-                        for (var i = 1; i < numLinksToRupert; i++)
-                          rangeLink.pop()
-
-                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
-                      }
-                      else
-                      {
                         receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
-                          .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+                          .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                        if (rangeLink.length > 0) // Atleast 1 order number was found on the Received sheet
+                        if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Received sheet
                         {
                           for (var i = 1; i < numLinksToRupert; i++)
                             rangeLink.pop()
@@ -1956,13 +1941,10 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                         }
                         else
                         {
-                          shippedSheet = ss.getSheetByName('Shipped');
-                          gid = shippedSheet.getSheetId()
+                          receivedSheet.getSheetValues(4, 5, receivedSheet.getLastRow() - 3, 1)
+                            .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                          shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
-                            .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
-
-                          if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Shipped sheet
+                          if (rangeLink.length > 0) // Atleast 1 order number was found on the Received sheet
                           {
                             for (var i = 1; i < numLinksToRupert; i++)
                               rangeLink.pop()
@@ -1971,10 +1953,13 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                           }
                           else
                           {
-                            shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
-                              .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+                            shippedSheet = ss.getSheetByName('Shipped');
+                            gid = shippedSheet.getSheetId()
 
-                            if (rangeLink.length > 0) // Atleast 1 order number was found on the Shipped sheet
+                            shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                              .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
+
+                            if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Shipped sheet
                             {
                               for (var i = 1; i < numLinksToRupert; i++)
                                 rangeLink.pop()
@@ -1983,13 +1968,10 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                             }
                             else
                             {
-                              orderSheet = ss.getSheetByName('Order');
-                              gid = orderSheet.getSheetId()
+                              shippedSheet.getSheetValues(4, 5, shippedSheet.getLastRow() - 3, 1)
+                                .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=E' + (row + 4)) : null)
 
-                              orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
-                                .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
-
-                              if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Order sheet
+                              if (rangeLink.length > 0) // Atleast 1 order number was found on the Shipped sheet
                               {
                                 for (var i = 1; i < numLinksToRupert; i++)
                                   rangeLink.pop()
@@ -1998,101 +1980,121 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                               }
                               else
                               {
-                                orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
-                                  .map((description, row) => (description[0].includes('Order# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                                orderSheet = ss.getSheetByName('Order');
+                                gid = orderSheet.getSheetId()
 
-                                if (rangeLink.length > 0) // Atleast 1 order number was found on the Order sheet
+                                orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                                  .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                                if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Order sheet
                                 {
                                   for (var i = 1; i < numLinksToRupert; i++)
                                     rangeLink.pop()
 
                                   richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
-                                } 
+                                }
+                                else
+                                {
+                                  orderSheet.getSheetValues(4, 5, orderSheet.getLastRow() - 3, 1)
+                                    .map((description, row) => (description[0].includes('Order# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+
+                                  if (rangeLink.length > 0) // Atleast 1 order number was found on the Order sheet
+                                  {
+                                    for (var i = 1; i < numLinksToRupert; i++)
+                                      rangeLink.pop()
+
+                                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                  } 
+                                }
                               }
                             }
                           }
                         }
-                      }
 
-                      numLinksToRupert++;
-                      break;
-                  }
-                  break;
-                case "Parksville":
-                  ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
-                  itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
-                  gid = itemsToRichmondSheet.getSheetId();
+                        numLinksToRupert++;
+                        break;
+                    }
+                    break;
+                  case "Parksville":
+                    ss = SpreadsheetApp.openById('181NdJVJueFNLjWplRNsgNl0G-sEJVW3Oy4z9vzUFrfM')
+                    itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
+                    gid = itemsToRichmondSheet.getSheetId();
 
-                  itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
-                    .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
-
-                  if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Transfer sheet
-                  {
-                    for (var i = 1; i < numLinksFromParksille; i++)
-                      rangeLink.pop()
-
-                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
-                  }
-                  else 
-                  {
                     itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
-                      .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                      .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
 
-                    if (rangeLink.length > 0) // Atleast 1 order number was found on the Transfer sheet
+                    if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Transfer sheet
                     {
                       for (var i = 1; i < numLinksFromParksille; i++)
                         rangeLink.pop()
 
                       richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                     }
-                  }
+                    else 
+                    {
+                      itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
+                        .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
 
-                  numLinksFromParksille++;
-                  break;
-                case "Rupert":
-                  ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
-                  itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
-                  gid = itemsToRichmondSheet.getSheetId();
+                      if (rangeLink.length > 0) // Atleast 1 order number was found on the Transfer sheet
+                      {
+                        for (var i = 1; i < numLinksFromParksille; i++)
+                          rangeLink.pop()
 
-                  itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
-                    .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                      }
+                    }
 
-                  if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Transfer sheet
-                  {
-                    for (var i = 1; i < numLinksFromRupert; i++)
-                      rangeLink.pop()
+                    numLinksFromParksille++;
+                    break;
+                  case "Rupert":
+                    ss = SpreadsheetApp.openById('1IEJfA5x7sf54HBMpCz3TAosJup4TrjXdUOqm4KK3t9c')
+                    itemsToRichmondSheet = ss.getSheetByName('ItemsToRichmond');
+                    gid = itemsToRichmondSheet.getSheetId();
 
-                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
-                  }
-                  else 
-                  {
                     itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
-                      .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
+                      .map((description, row) => (description[0].includes('Inv# ' + invoiceNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
 
-                    if (rangeLink.length > 0) // Atleast 1 order number was found on the Transfer sheet
+                    if (rangeLink.length > 0) // Atleast 1 invoice number was found on the Transfer sheet
                     {
                       for (var i = 1; i < numLinksFromRupert; i++)
                         rangeLink.pop()
 
                       richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                     }
-                  }
+                    else 
+                    {
+                      itemsToRichmondSheet.getSheetValues(4, 4, itemsToRichmondSheet.getLastRow() - 3, 1)
+                        .map((description, row) => (description[0].includes('Order# ' + orderNumbers[ordNum][0])) ? rangeLink.push(url + '?gid=' + gid + '#gid=' + gid + '&range=B' + (row + 4)) : null)
 
-                  numLinksFromRupert++;
-                  break;
+                      if (rangeLink.length > 0) // Atleast 1 order number was found on the Transfer sheet
+                      {
+                        for (var i = 1; i < numLinksFromRupert; i++)
+                          rangeLink.pop()
+
+                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                      }
+                    }
+
+                    numLinksFromRupert++;
+                    break;
+                }
               }
-            }
 
-            noteLength += run.length + 1;
-          })
-          
-          return [richTextBuilder.build()];
-        }
+              noteLength += run.length + 1;
+            })
+            
+            return [richTextBuilder.build()];
+          }
 
-        return richText
-      })
+          return richText
+        })
 
-      notesRange.setRichTextValues(notes);
+        notesRange.setRichTextValues(notes);
+      }
+      else // B/O or I/O
+      {
+        Logger.log('Need to create an updater Script for I/O and B/O')
+      }
     }
   })
 
@@ -2578,59 +2580,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], order[isOrderCompleteIdx]), '', '', getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders, order[invoiceNumIdx])] // Charter & Guide Orders
   });
 
-  Logger.log('newCharterGuideOrders:')
-  Logger.log(newCharterGuideOrders)
-
-  // const newLodgeOrders = 
-  //   (isInvoicedOrders) ?       // If true, then the import is a set of invoiced orders
-  //     ((creditNumIdx !== -1) ? // If true, then the import is a set of credits
-  //       allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
-  //         ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //           (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12')) 
-  //           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //         && !lodgeCredited.includes(order[creditNumIdx].toString().trim())).map(order => {
-  //         return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx].toString(), months), 'No'] // Lodge Completed
-  //       }) : 
-  //     allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
-  //       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //         (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12')) 
-  //         || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //       && !lodgeCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => {
-  //       return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((order[invoiceDateIdx].toString() == ' ') ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Lodge Completed
-  //     })) :
-  //   allOrders.filter(order => lodgeCustomerNumbers.includes(order[custNumIdx]) && 
-  //     ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //       (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12'))
-  //       || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //     && order[isOrderCompleteIdx] == 'No' && !lodgeOrders.includes(order[orderNumIdx].toString().trim())).map(order => { 
-  //     return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], lodgeCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], order[isOrderCompleteIdx]), '', '', getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders, order[invoiceNumIdx])] // Lodge Orders
-  // });
-
-  // const newCharterGuideOrders = 
-  //   (isInvoicedOrders) ?       // If true, then the import is a set of invoiced orders
-  //     ((creditNumIdx !== -1) ? // If true, then the import is a set of credits
-  //       allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
-  //         ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //           (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12'))
-  //           || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //         && !charterGuideCredited.includes(order[creditNumIdx].toString().trim())).map(order => { 
-  //         return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'Credit # ' + order[creditNumIdx] + '\nThis credit was automatically imported', order[invoiceNumIdx], '$' + -1*Number(order[totalIdx]), getFullName(order[creditedByIdx]), 'Credited', getDateString(order[creditDateIdx].toString(), months), 'No'] // Charter & Guide Completed
-  //       }) : 
-  //     allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
-  //       ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //         (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12'))
-  //         || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //       && !charterGuideCompleted.includes(order[invoiceNumIdx].toString().trim())).map(order => { 
-  //       return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], 'TRUE', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', order[invoiceNumIdx], '$' + order[totalIdx], getFullName(order[invoicedByIdx]), getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders), getDateString((order[invoiceDateIdx].toString() == ' ') ? todayFormattedDate : order[invoiceDateIdx].toString(), months), order[isOrderCompleteIdx]] // Charter & Guide Completed
-  //     })) :
-  //   allOrders.filter(order => charterGuideCustomerNumbers.includes(order[custNumIdx]) &&
-  //     ((includeLastYearsFinalQuarterOrders && order[dateIdx].substring(6) == lastYear &&
-  //       (order[dateIdx].substring(0, 2) == '09' || order[dateIdx].substring(0, 2) == '10' || order[dateIdx].substring(0, 2) == '11' || order[dateIdx].substring(0, 2) == '12'))
-  //       || (isCurrentLodgeSeasonYear && order[dateIdx].substring(6) == currentYear))
-  //     && order[isOrderCompleteIdx] == 'No' && !charterGuideOrders.includes(order[orderNumIdx].toString().trim())).map(order => {
-  //     return [getDateString(order[dateIdx].toString(), months), getFullName(order[employeeNameIdx]), order[orderNumIdx], '', '', getProperTypesetName(order[customerNameIdx], charterGuideCustomerNames, 1), getLocationName(order[locationIdx]), '', '', 'This order was automatically imported', getInvoiceNumber(order[invoiceNumIdx], order[isOrderCompleteIdx]), '', '', getOrderStatus(order[isOrderCompleteIdx], isInvoicedOrders, order[invoiceNumIdx])] // Charter & Guide Orders
-  // });
-
   const numNewLodgeOrder = newLodgeOrders.length;
   const numNewCharterGuideOrder = newCharterGuideOrders.length;
 
@@ -2703,11 +2652,6 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         .filter(ord => ord[11] === 'Completed')
         .map(ord => ord[0].toString()).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order'); 
-
-      Logger.log('completedLodgeOrderNumbers:')
-      Logger.log(completedLodgeOrderNumbers)
-      Logger.log('lodgePartiallyCompleteOrders:')
-      Logger.log(lodgePartiallyCompleteOrders)
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
       const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
