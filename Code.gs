@@ -2267,6 +2267,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const customerNumIdx = headerOE.indexOf('Cust #');
   const originalOrderedQtyIdx = headerOE.indexOf('Qty Original Ordered');
   const orderedQtyIdx = headerOE.indexOf('Qty Ordered'); 
+  const shippedQtyIdx = headerOE.indexOf('Qty Shipped'); 
   const backOrderQtyIdx = headerOE.indexOf('Backorder'); 
   const skuIdx = headerOE.indexOf('Item');
   const descriptionIdx = headerOE.indexOf('Description');
@@ -2299,7 +2300,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
   const reuploadSheet = spreadsheet.getSheetByName('Reupload:' + orderNumber);
   const itemSheet = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? spreadsheet.getSheetByName('B/O').activate() : spreadsheet.getSheetByName('I/O').activate();
   const numRows = itemSheet.getLastRow() - 2;
-  var noteValues;
+  var noteValues, qty;
   itemSheet?.getFilter()?.remove(); // Remove the filter
 
   if (reuploadSheet)
@@ -2310,17 +2311,18 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
 
     var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                       items.filter(item => item[isItemCompleteIdx])
-                        .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                        .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
                         .map(item => {
 
                           noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+                          qty = Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]);
 
                           return (noteValues) ? 
-                              [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-                              item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                              [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
+                              item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
                               noteValues[1], noteValues[2], noteValues[4]] : 
-                            [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-                            item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                            [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
+                            item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
                             '', '', '']}) : 
       items.map(item => { 
 
@@ -2359,17 +2361,18 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
     {
       var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                         items.filter(item => item[isItemCompleteIdx])
-                             .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
                              .map(item => {
 
                                 noteValues = deletedItemsFromCurrentOrder.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
+                                qty = Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]);
 
                                 return (noteValues) ? 
-                                    [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-                                    item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                                    [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
+                                    item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
                                     noteValues[1], noteValues[2], noteValues[3]] : 
-                                  [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-                                  item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+                                  [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
+                                  item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
                                   '', '', '']}) : 
         items.map(item => { 
 
@@ -2387,11 +2390,12 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
     {
       var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                         items.filter(item => item[isItemCompleteIdx])
-                             .filter(item => item[backOrderQtyIdx] || item[skuIdx] === 'Comment')
+                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
                              .map(item => 
-                                [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-                                item[descriptionIdx], item[unitPriceIdx], Number(item[backOrderQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-                                '', '', '']) : 
+                                [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], 
+                                Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]), removeDashesFromSku(item[skuIdx]), item[descriptionIdx], 
+                                item[unitPriceIdx], Number(Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]))*Number(item[unitPriceIdx]), 
+                                locationName , orderNumber, '', '', '']) : 
       items.map(item => 
         [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
         item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
