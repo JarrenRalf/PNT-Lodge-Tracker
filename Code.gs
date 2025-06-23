@@ -705,12 +705,14 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
               if (row !== -1)
               {
-                numRows = ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2]) - row + 1;
+                numRows = Number(ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2])) - row + 1;
                 itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
-                spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                  .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
 
-                Logger.log('Found ORD# ' + ordNum[2] + 'on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                  spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
                 ioSheet.deleteRows(row + 3, numRows);
                 SpreadsheetApp.flush();
@@ -723,10 +725,12 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
                 {
                   numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
                   itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
-                  spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
 
-                  Logger.log('Found ORD# ' + ordNum[2] + 'on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+                  if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                    spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                      .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                  Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
                   boSheet.deleteRows(row + 3, numRows);
                   SpreadsheetApp.flush();
@@ -741,10 +745,12 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
               {
                 numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
                 itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
-                spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                  .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
 
-                Logger.log('Found ORD# ' + ordNum[2] + 'on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                  spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+
+                Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
                 boSheet.deleteRows(row + 3, numRows);
                 SpreadsheetApp.flush();
@@ -770,7 +776,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
             if (row !== -1)
             {
-              Logger.log('Found ORD# ' + ordNum[2] + 'on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+              Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
               numRows = orderNumbers.findLastIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]) - row + 1;
               boSheet.deleteRows(row + 3, numRows);
               SpreadsheetApp.flush();
@@ -785,7 +791,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
             if (row !== -1)
             {
-              Logger.log('Found ORD# ' + ordNum[2] + 'on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+              Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
               numRows = orderNumbers.findLastIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]) - row + 1;
               ioSheet.deleteRows(row + 3, numRows);
               SpreadsheetApp.flush();
@@ -806,7 +812,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
         if (row_BO !== -1)
         {
-          Logger.log('Found ORD# ' + ordNum[2] + 'on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+          Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
           const numRows_BO = orderNumbers_BO.findLastIndex(ordNum_BO => ordNum_BO[0] == orderNumber) - row_BO + 1;
           boSheet.deleteRows(row_BO + 3, numRows_BO);
         }
@@ -819,7 +825,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
         if (row_IO !== -1)
         {
-          Logger.log('Found ORD# ' + ordNum[2] + 'on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+          Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
           const numRows_IO = orderNumbers_IO.findLastIndex(ordNum_IO => ordNum_IO[0] == orderNumber) - row_IO + 1;
           ioSheet.deleteRows(row_IO + 3, numRows_IO);
         }
@@ -910,7 +916,6 @@ function establishItemLinks_INVD(invdSheet, ...sheets)
       
       notesAndinvoiceNumbers = range.getRichTextValues().map(rowVals => {
         invoiceNumber = rowVals[1].getText();
-        Logger.log(invoiceNumber)
         notes = rowVals[0].getText();
         isCreditNumInNotes = notes.match(/\d{5}/); // match 5-digit number
         row_invd = (invoiceAndCreditNumbers_Invd) ? invoiceAndCreditNumbers_Invd.findIndex(inv => inv[0] == invoiceNumber && isBlank(inv[1])) + 3 : -1;
