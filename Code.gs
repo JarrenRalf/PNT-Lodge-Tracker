@@ -840,10 +840,10 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
   const ioSheet_NumRows_Updated = ioSheet.getLastRow() - 1;
 
   if (boSheet_NumRows_Updated > 0)
-    boSheet.getRange(2, 1, boSheet_NumRows_Updated, boSheet_NumCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+    boSheet.getRange(2, 1, boSheet_NumRows_Updated, numCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
 
   if (ioSheet_NumRows_Updated > 0)
-    ioSheet.getRange(2, 1, ioSheet_NumRows_Updated, ioSheet_NumCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number;
+    ioSheet.getRange(2, 1, ioSheet_NumRows_Updated, numCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number;
 }
 
 /**
@@ -996,12 +996,12 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
         row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] == orderNumber) + 3 : -1;
 
         if (row_io > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':N' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()]      
+          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':M' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()]      
         else if (orderNumbersAndSku_BO) // Make sure there are back order items on the list
         {
           row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] == orderNumber) + 3;
         
-          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':N' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()] : ordNum;
+          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':M' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()] : ordNum;
         }
         else 
           return ordNum;
@@ -1034,9 +1034,9 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
           row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
 
           if (row_bo > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':N' + row_bo)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':M' + row_bo)
           else if (row_io > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':N' + row_io)
+            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':M' + row_io)
           else if (row_invd > 2)
             richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + row_invd)
               .setTextStyle(startIndex, endIndex, SpreadsheetApp.newTextStyle().setForegroundColor('#b45f06').setUnderline(true).build())
@@ -1131,7 +1131,7 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
           }
         }
 
-        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':M' + row_PO  ).build()] : 
+        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':L' + row_PO  ).build()] : 
              (row_RECD > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()] : noteValues;
       })
 
