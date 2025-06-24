@@ -645,14 +645,15 @@ function createNewLodgeTracker()
     const boSheet = newSpreadsheet.getSheetByName('B/O')
     const ioSheet = newSpreadsheet.getSheetByName('I/O')
     const poSheet = newSpreadsheet.getSheetByName('P/O')
+    const numCols = boSheet.getLastColumn();
     
     lodgeOrdersSheet.getRange(1, 1).setValue(year + ' Lodge Orders').offset(2, 0, lodgeOrdersSheet.getMaxRows() - 2, lodgeOrdersSheet.getLastColumn()).clearContent()
     guideOrdersSheet.getRange(1, 1).setValue(year + ' Guide Orders').offset(2, 0, guideOrdersSheet.getMaxRows() - 2, guideOrdersSheet.getLastColumn()).clearContent()
     lodgeCompletedSheet.getRange(1, 1).setValue(year + ' Completed Lodge Orders').offset(2, 0, lodgeCompletedSheet.getMaxRows() - 2, lodgeCompletedSheet.getLastColumn()).clearContent()
     guideCompletedSheet.getRange(1, 1).setValue(year + ' Completed Guide Orders').offset(2, 0, guideCompletedSheet.getMaxRows() - 2, guideCompletedSheet.getLastColumn()).clearContent()
     cancelledSheet.getRange(1, 1).setValue(year + ' Cancelled Orders').offset(2, 0, cancelledSheet.getMaxRows() - 2, cancelledSheet.getLastColumn()).clearContent()
-    boSheet.getRange(1, 1).setValue(year + ' Back Orders').offset(2, 0, boSheet.getMaxRows() - 2, boSheet.getLastColumn()).clearContent()
-    ioSheet.getRange(1, 1).setValue(year + '  Initial Items Ordered').offset(2, 0, ioSheet.getMaxRows() - 2, ioSheet.getLastColumn()).clearContent()
+    boSheet.getRange(1, 1).setValue(year + ' Back Orders').offset(2, 0, boSheet.getMaxRows() - 2, numCols).clearContent()
+    ioSheet.getRange(1, 1).setValue(year + '  Initial Items Ordered').offset(2, 0, ioSheet.getMaxRows() - 2, numCols).clearContent()
     poSheet.getRange(1, 1).setValue(year + ' Purchase Orders').offset(2, 0, poSheet.getMaxRows() - 2, poSheet.getLastColumn()).clearContent()
     SpreadsheetApp.flush();
     SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 2.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
@@ -674,15 +675,14 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
   const ioSheet = spreadsheet.getSheetByName('I/O');
   const boSheet_NumRows = boSheet.getLastRow() - 2;
   const ioSheet_NumRows = ioSheet.getLastRow() - 2;
-  const boSheet_NumCols = boSheet.getLastColumn();
-  const ioSheet_NumCols = ioSheet.getLastColumn();
-  const boItems = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 1, boSheet_NumRows, boSheet_NumCols) : null;
-  const ioItems = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 1, ioSheet_NumRows, ioSheet_NumCols) : null;
+  const numCols = boSheet.getLastColumn();
+  const boItems = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 1, boSheet_NumRows, numCols) : null;
+  const ioItems = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 1, ioSheet_NumRows, numCols) : null;
   
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove();
-  boSheet.getRange(2, 1, boSheet_NumRows + 1, boSheet_NumCols).createFilter().sort(11, true)
-  ioSheet.getRange(2, 1, ioSheet_NumRows + 1, ioSheet_NumCols).createFilter().sort(11, true)
+  boSheet.getRange(2, 1, boSheet_NumRows + 1, numCols).createFilter().sort(11, true)
+  ioSheet.getRange(2, 1, ioSheet_NumRows + 1, numCols).createFilter().sort(11, true)
   SpreadsheetApp.flush();
 
   if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
@@ -706,11 +706,11 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
               if (row !== -1)
               {
                 numRows = Number(ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2])) - row + 1;
-                itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
 
-                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
                   spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+                    .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
 
                 Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
@@ -724,11 +724,11 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
                 if (row !== -1)
                 {
                   numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
-                  itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                  itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
 
-                  if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                  if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
                     spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                      .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+                      .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
 
                   Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
@@ -744,11 +744,11 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
               if (row !== -1)
               {
                 numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
-                itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], '', item[13]])
+                itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
 
-                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3]) || isNotBlank(row[4])))
+                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
                   spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                    .getRange(2, 1, itemsOnOrder.length, 5).setNumberFormat('@').setValues(itemsOnOrder)
+                    .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
 
                 Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
@@ -970,8 +970,9 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const   ioSheet_NumRows =   ioSheet_NumRowsPlusHeader - 1;
   const   poSheet_NumRows =   poSheet.getLastRow() - 2;
   const invdSheet_NumRows = invdSheet.getLastRow() - 2;
-    boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader, boSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
-    ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, ioSheet.getLastColumn()).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+  const numCols = boSheet.getLastColumn()
+    boSheet.getRange(2, 1, boSheet_NumRowsPlusHeader, numCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
+    ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, numCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
   
   const orderNumbersAndSku_BO   = (  boSheet_NumRows > 0) ?   boSheet.getSheetValues(3, 6,   boSheet_NumRows, 6) : null;
@@ -2335,10 +2336,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
                           return (noteValues) ? 
                               [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
                               item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
-                              noteValues[1], noteValues[2], noteValues[4]] : 
+                              noteValues[1], noteValues[2]] : 
                             [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
                             item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
-                            '', '', '']}) : 
+                            '', '']}) : 
       items.map(item => { 
 
         noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
@@ -2346,10 +2347,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
         return (noteValues) ? 
             [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
             item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-            noteValues[1], noteValues[2], noteValues[4]] :
+            noteValues[1], noteValues[2]] :
           [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
           item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-          '', '', '']})
+          '', '']})
 
     spreadsheet.deleteSheet(reuploadSheet)
   }
@@ -2366,7 +2367,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
         isCurrentOrder = item[ordNum] == orderNumber;
 
         if (isCurrentOrder)
-          deletedItemsFromCurrentOrder.push([item[5], item[11], item[12], item[13]])
+          deletedItemsFromCurrentOrder.push([item[5], item[11], item[12]])
 
         return isBlank(item[ordNum]) || !isCurrentOrder;
       });
@@ -2385,10 +2386,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
                                 return (noteValues) ? 
                                     [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
                                     item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
-                                    noteValues[1], noteValues[2], noteValues[3]] : 
+                                    noteValues[1], noteValues[2]] : 
                                   [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], qty, removeDashesFromSku(item[skuIdx]), 
                                   item[descriptionIdx], item[unitPriceIdx], qty*Number(item[unitPriceIdx]), locationName , orderNumber, 
-                                  '', '', '']}) : 
+                                  '', '']}) : 
         items.map(item => { 
 
           noteValues = deletedItemsFromCurrentOrder.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
@@ -2396,10 +2397,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
           return (noteValues) ? 
               [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
               item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-              noteValues[1], noteValues[2], noteValues[3]] :
+              noteValues[1], noteValues[2]] :
             [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
             item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-            '', '', '']})
+            '', '']})
     }
     else
     {
@@ -2410,11 +2411,11 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
                                 [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], 
                                 Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]), removeDashesFromSku(item[skuIdx]), item[descriptionIdx], 
                                 item[unitPriceIdx], Number(Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]))*Number(item[unitPriceIdx]), 
-                                locationName , orderNumber, '', '', '']) : 
+                                locationName , orderNumber, '', '']) : 
       items.map(item => 
         [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
         item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-        '', '', ''])
+        '', ''])
     }
   }
 
@@ -2439,10 +2440,10 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
 
     if (numRows > 0)
       itemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@','#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@'])).setValues(newItems)
         .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 11, ascending: true}]);
     else
-      itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+      itemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '@', '#', '#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@']))
         .setValues(newItems)
 
     if (doesOrderContainBOs(orderNumber, orderNumbers_BO))
@@ -2959,9 +2960,9 @@ function updatePoItemsOnTracker(items, spreadsheet)
       return (noteValues) ? 
           [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
             item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName, purchaseOrderNumber, 
-            noteValues[1], noteValues[3], noteValues[4]] : 
+            noteValues[1], noteValues[3]] : 
         [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], removeDashesFromSku(item[skuIdx]), 
-          item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName, purchaseOrderNumber, '', '', '']
+          item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName, purchaseOrderNumber, '', '']
 
     }).filter(item => item[3] !== 0 || item[4] === ' '); // Remove items that have already been received, as well as keep comments / notes
 
@@ -2970,20 +2971,21 @@ function updatePoItemsOnTracker(items, spreadsheet)
   else
   {
     var newItems = items.map(item => [orderDate, vendorName, item[originalOrderedQtyIdx], item[backOrderQtyIdx], 
-      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '', '']
+      removeDashesFromSku(item[skuIdx]), item[descriptionIdx], item[unitCostIdx], item[extendedUnitCostIdx], locationName , purchaseOrderNumber, '', '']
     ).filter(item => item[3] !== 0 || item[4] === ' '); // Remove items that have already been received, as well as keep comments / notes
   }
 
   const poItemSheet = spreadsheet.getSheetByName('P/O').activate(); 
   const numRows = poItemSheet.getLastRow() - 2;
+  const numCols = poItemSheet.getLastColumn();
   const numNewItems = newItems.length;
   var numItemsRemoved = numNewItems;
   poItemSheet?.getFilter()?.remove(); // Remove the filter
 
   if (numRows > 0)
   {
-    const poNum = poItemSheet.getSheetValues(2, 1, 1, 14).flat().indexOf('Purchase Order #');
-    var currentItems = poItemSheet.getSheetValues(3, 1, numRows, poItemSheet.getLastColumn()).filter(item => item[poNum] !== purchaseOrderNumber);
+    const poNum = poItemSheet.getSheetValues(2, 1, 1, numCols).flat().indexOf('Purchase Order #');
+    var currentItems = poItemSheet.getSheetValues(3, 1, numRows, numCols).filter(item => item[poNum] !== purchaseOrderNumber);
     var numCurrentItems = currentItems.length;
     poItemSheet.getRange(3, 1, numCurrentItems, currentItems[0].length).setValues(currentItems);
 
@@ -2998,14 +3000,12 @@ function updatePoItemsOnTracker(items, spreadsheet)
 
   if (numNewItems > 0)
   {
-    const numCols = newItems[0].length;
-
     if (numRows > 0)
       poItemSheet.getRange(numCurrentItems + 3, 1, numNewItems, numCols)
-          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@'])).setValues(newItems)
+          .setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@'])).setValues(newItems)
         .offset(-1*numCurrentItems, 0, numCurrentItems + numNewItems, numCols).sort([{column: 10, ascending: true}]);
     else
-      poItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@', '@']))
+      poItemSheet.getRange(3, 1, numNewItems, numCols).setNumberFormats(new Array(numNewItems).fill(['MMM dd, yyyy', '@', '#','#', '@', '@', '$#,##0.00', '$#,##0.00', '@', '@', '@', '@']))
         .setValues(newItems)
 
     Logger.log('The following new Ordered items were added to the P/O tab:')
