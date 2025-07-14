@@ -42,6 +42,7 @@ function onChange(e)
             (info[isAdagioOE] || info[isAdagioPO] || info[isAdagioPO_Receipts] || info[isBackOrderItems] || info[isPurchaseOrderItems] || info[isReceivedItems] || info[isInvoicedItems]))) 
         {
           spreadsheet.toast('Processing imported data...', '', 60)
+          SpreadsheetApp.flush();
           
           const values = sheets[sheet].getSheetValues(1, 1, info[numRows], info[numCols]); // This is the shopify order data
           const fileName = sheets[sheet].getSheetName();
@@ -128,6 +129,7 @@ function installedOnOpen(e)
   const year = (today.getMonth() > 7) ? (today.getFullYear() + 1).toString() : today.getFullYear().toString();
   const spreadsheet = e.source;
   const lodgeOrdersSheet = spreadsheet.getSheetByName('LODGE ORDERS');
+  SpreadsheetApp.flush()
   const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
   const areTriggersCreated = spreadsheet.getSheetByName('Triggers').getRange(1, 1).isChecked();
   const currentTransferSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(" ").shift();
@@ -2777,17 +2779,26 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
             if (Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
             {
               Logger.log(Number(ord[orderNumIdx]))
-              reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-              ioItems = ioItems.filter(ordNum => {
+              try
+              {
+                reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-                isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+                ioItems = ioItems.filter(ordNum => {
 
-                if (!isThisOrdNumberRemovedFromItemsSheet)
-                  reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+                  isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-                return isThisOrdNumberRemovedFromItemsSheet
-              }); // Remove the items from the I/O page
+                  if (!isThisOrdNumberRemovedFromItemsSheet)
+                    reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+                  return isThisOrdNumberRemovedFromItemsSheet
+                }); // Remove the items from the I/O page
+              }
+              catch (e)
+              {
+                var error = e['stack'];
+                Logger.log(error)
+              }
 
               numIOsRemoved++;
             }
@@ -2799,17 +2810,26 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
             if (itemsOnOrder.length !== 0 && Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
             {
               Logger.log(Number(ord[orderNumIdx]))
-              reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-              boItems = boItems.filter(ordNum => {
+              try
+              {
+                reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-                isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+                boItems = boItems.filter(ordNum => {
 
-                if (!isThisOrdNumberRemovedFromItemsSheet)
-                  reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+                  isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-                return isThisOrdNumberRemovedFromItemsSheet
-              }); // Remove the items from the B/O page
+                  if (!isThisOrdNumberRemovedFromItemsSheet)
+                    reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+                  return isThisOrdNumberRemovedFromItemsSheet
+                }); // Remove the items from the B/O page
+              } 
+              catch (e)
+              {
+                var error = e['stack'];
+                Logger.log(error)
+              }
 
               numBOsRemoved++;
             }
@@ -2822,17 +2842,26 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
           if (itemsOnOrder.length !== 0 && Math.round((itemsOnOrder.map(amount => Number(amount[8])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(ord[orderValueIdx]))
           {
             Logger.log(Number(ord[orderValueIdx]))
-            reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-            boItems = boItems.filter(ordNum => {
+            try 
+            {
+              reuploadSheet = spreadsheet.insertSheet('Reupload:' + ord[orderNumIdx], {template: templateSheet}).hideSheet();
 
-              isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
+              boItems = boItems.filter(ordNum => {
 
-              if (!isThisOrdNumberRemovedFromItemsSheet)
-                reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+                isThisOrdNumberRemovedFromItemsSheet = ordNum[10] !== ord[orderNumIdx];
 
-              return isThisOrdNumberRemovedFromItemsSheet
-            }); // Remove the items from the B/O page
+                if (!isThisOrdNumberRemovedFromItemsSheet)
+                  reuploadSheet.appendRow([ordNum[5], ordNum[11], ordNum[12], '', ordNum[13]]);
+
+                return isThisOrdNumberRemovedFromItemsSheet
+              }); // Remove the items from the B/O page
+            }
+            catch (e)
+            {
+              var error = e['stack'];
+              Logger.log(error)
+            }
 
             numBOsRemoved++;
           }
