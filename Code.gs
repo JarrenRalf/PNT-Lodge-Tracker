@@ -675,16 +675,13 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
   const templateSheet = spreadsheet.getSheetByName('Reupload:');
   const boSheet = spreadsheet.getSheetByName('B/O');
   const ioSheet = spreadsheet.getSheetByName('I/O');
-  const boSheet_NumRows = boSheet.getLastRow() - 2;
-  const ioSheet_NumRows = ioSheet.getLastRow() - 2;
   const numCols = boSheet.getLastColumn();
-  const boItems = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 1, boSheet_NumRows, numCols) : null;
-  const ioItems = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 1, ioSheet_NumRows, numCols) : null;
+  var boSheet_NumRows, ioSheet_NumRows, boItems, ioItems;
   
   boSheet?.getFilter()?.remove(); // Remove the filter
   ioSheet?.getFilter()?.remove();
-  boSheet.getRange(2, 1, boSheet_NumRows + 1, numCols).createFilter().sort(11, true)
-  ioSheet.getRange(2, 1, ioSheet_NumRows + 1, numCols).createFilter().sort(11, true)
+  boSheet.getRange(2, 1, boSheet.getLastRow() - 1, numCols).createFilter().sort(11, true)
+  ioSheet.getRange(2, 1, ioSheet.getLastRow() - 1, numCols).createFilter().sort(11, true)
   SpreadsheetApp.flush();
 
   if (Array.isArray(orderNumber)) // When importing new orders the argument passed to this function is an array with multiple order numbers
@@ -701,6 +698,11 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
           if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
           {
+            boSheet_NumRows = boSheet.getLastRow() - 2;
+            ioSheet_NumRows = ioSheet.getLastRow() - 2;
+            boItems = (boSheet_NumRows > 0) ? boSheet.getSheetValues(3, 1, boSheet_NumRows, numCols) : null;
+            ioItems = (ioSheet_NumRows > 0) ? ioSheet.getSheetValues(3, 1, ioSheet_NumRows, numCols) : null;
+
             if (ioItems)
             {
               row = ioItems.findIndex(ordNum_IO => ordNum_IO[10] == ordNum[2]);
@@ -766,6 +768,9 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
     }
     else
     {
+      boSheet_NumRows = boSheet.getLastRow() - 2;
+      ioSheet_NumRows = ioSheet.getLastRow() - 2;
+
       orderNumber.map(ordNum => {
 
         if (!isBlank(ordNum[2]))
@@ -780,6 +785,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
             {
               Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
               numRows = orderNumbers.findLastIndex(ordNum_BO => ordNum_BO[0] == ordNum[2]) - row + 1;
+
               boSheet.deleteRows(row + 3, numRows);
               SpreadsheetApp.flush();
             }
@@ -795,6 +801,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
             {
               Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
               numRows = orderNumbers.findLastIndex(ordNum_IO => ordNum_IO[0] == ordNum[2]) - row + 1;
+
               ioSheet.deleteRows(row + 3, numRows);
               SpreadsheetApp.flush();
             }
@@ -807,6 +814,9 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
   {
     if (!isBlank(orderNumber)) // Order number is not blank on the Orders page
     {
+      boSheet_NumRows = boSheet.getLastRow() - 2;
+      ioSheet_NumRows = ioSheet.getLastRow() - 2;
+      
       if (boSheet_NumRows > 0)
       {
         const orderNumbers_BO = boSheet.getSheetValues(3, 11, boSheet_NumRows, 1);
@@ -814,7 +824,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
         if (row_BO !== -1)
         {
-          Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+          Logger.log('Found ORD# ' + orderNumber + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
           const numRows_BO = orderNumbers_BO.findLastIndex(ordNum_BO => ordNum_BO[0] == orderNumber) - row_BO + 1;
           boSheet.deleteRows(row_BO + 3, numRows_BO);
         }
@@ -827,7 +837,7 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
         if (row_IO !== -1)
         {
-          Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
+          Logger.log('Found ORD# ' + orderNumber + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
           const numRows_IO = orderNumbers_IO.findLastIndex(ordNum_IO => ordNum_IO[0] == orderNumber) - row_IO + 1;
           ioSheet.deleteRows(row_IO + 3, numRows_IO);
         }
@@ -1181,7 +1191,7 @@ function getChartData()
     chartData.push(new Array(8).fill(0))
 
   // Gather the chart data from the invoice data
-  invoiceDataSheet.getSheetValues(2, 3, invoiceDataSheet.getLastRow() - 1, 6).filter(date =>  date[0].getFullYear() >= sevenYearsAgo)
+  invoiceDataSheet.getSheetValues(2, 3, invoiceDataSheet.getLastRow() - 1, 6).filter(date => date[0].getFullYear() >= sevenYearsAgo)
     .map(amount => chartData[Math.ceil((amount[0] - firstDayOfYear[amount[0].getFullYear()]) / millisecondsInWeek)][currentYear - amount[0].getFullYear()] += Number(amount[5]))
 
   // Convert the data into cumulative data
