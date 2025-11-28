@@ -139,14 +139,18 @@ function installedOnOpen(e)
   {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('Add selected rows to new Lodge Tracker').addItem('Add selected rows to new Lodge Tracker', 'addSelectedRowsToNewLodgeTracker').addToUi();
-    ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 2.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+    ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
   }
   else if (year !== currentTransferSheetYear) // If it is september or later and the current spreadsheet is not "next years" spreadsheet
+  {
     if (today.getMonth() > 7) SpreadsheetApp.getUi().createMenu('Create ' + year + ' Lodge Tracker').addItem('Create ' + year + ' Lodge Tracker', 'createNewLodgeTracker').addToUi();
+  }
   else if (!areTriggersCreated)
     SpreadsheetApp.getUi().createMenu('Create Triggers').addItem('Create Triggers', 'triggers_CreateAll').addToUi();
   // else
-  //   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
+    //SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
+
+  SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Update Chart Data', 'getChartData').addToUi();
 
   [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
   setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet, spreadsheet.getSheetByName('B/O'),  spreadsheet.getSheetByName('I/O'))
@@ -367,7 +371,7 @@ function addSelectedRowsToNewLodgeTracker()
       url += '?gid=' + sheetId + '#gid=' + sheetId;
       SpreadsheetApp.flush()
 
-      SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + (new Date().getFullYear() + 1) + ' Lodge Order Tracking 2.0</a></p>')
+      SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + (new Date().getFullYear() + 1) + ' Lodge Order Tracking 3.0</a></p>')
         .setWidth(250).setHeight(50), 'New Lodge Tracker');
     }
     else
@@ -634,7 +638,7 @@ function createNewLodgeTracker()
   {
     const year = new Date().getFullYear() + 1
     const currentSpreadsheet = SpreadsheetApp.getActive();
-    const newSpreadsheet = currentSpreadsheet.copy(year + ' Lodge Order Tracking 2.0')
+    const newSpreadsheet = currentSpreadsheet.copy(year + ' Lodge Order Tracking 3.0')
     const url = newSpreadsheet.getUrl();
     currentSpreadsheet.getSheetByName('New Tracker').getRange(1, 1).setValue(url);
     newSpreadsheet.getSheetByName('Triggers').getRange(1, 1).uncheck();
@@ -647,18 +651,49 @@ function createNewLodgeTracker()
     const boSheet = newSpreadsheet.getSheetByName('B/O')
     const ioSheet = newSpreadsheet.getSheetByName('I/O')
     const poSheet = newSpreadsheet.getSheetByName('P/O')
+    const recdSheet = newSpreadsheet.getSheetByName("Rec'd")
+    const invdSheet = newSpreadsheet.getSheetByName("Inv'd")
+    const chartDataSheet = newSpreadsheet.getSheetByName('Chart Data')
+    const itemManagementSheet = newSpreadsheet.getSheetByName('Item Management (Jarren Only ;)')
     const numCols = boSheet.getLastColumn();
     
-    lodgeOrdersSheet.getRange(1, 1).setValue(year + ' Lodge Orders').offset(2, 0, lodgeOrdersSheet.getMaxRows() - 2, lodgeOrdersSheet.getLastColumn()).clearContent()
-    guideOrdersSheet.getRange(1, 1).setValue(year + ' Guide Orders').offset(2, 0, guideOrdersSheet.getMaxRows() - 2, guideOrdersSheet.getLastColumn()).clearContent()
-    lodgeCompletedSheet.getRange(1, 1).setValue(year + ' Completed Lodge Orders').offset(2, 0, lodgeCompletedSheet.getMaxRows() - 2, lodgeCompletedSheet.getLastColumn()).clearContent()
-    guideCompletedSheet.getRange(1, 1).setValue(year + ' Completed Guide Orders').offset(2, 0, guideCompletedSheet.getMaxRows() - 2, guideCompletedSheet.getLastColumn()).clearContent()
-    cancelledSheet.getRange(1, 1).setValue(year + ' Cancelled Orders').offset(2, 0, cancelledSheet.getMaxRows() - 2, cancelledSheet.getLastColumn()).clearContent()
-    boSheet.getRange(1, 1).setValue(year + ' Back Orders').offset(2, 0, boSheet.getMaxRows() - 2, numCols).clearContent()
-    ioSheet.getRange(1, 1).setValue(year + '  Initial Items Ordered').offset(2, 0, ioSheet.getMaxRows() - 2, numCols).clearContent()
-    poSheet.getRange(1, 1).setValue(year + ' Purchase Orders').offset(2, 0, poSheet.getMaxRows() - 2, poSheet.getLastColumn()).clearContent()
+    lodgeOrdersSheet.getRange(1, 1).setValue(year + ' Lodge Orders')
+      .offset(0,  12).setValue('- ' + year + ' Order Total')
+      .offset(2, -12, lodgeOrdersSheet.getMaxRows() - 2, lodgeOrdersSheet.getLastColumn()).clearContent()
+    guideOrdersSheet.getRange(1, 1).setValue(year + ' Guide Orders')
+      .offset(0,  12).setValue('- ' + year + ' Order Total')
+      .offset(2, -12, guideOrdersSheet.getMaxRows() - 2, guideOrdersSheet.getLastColumn()).clearContent()
+    lodgeCompletedSheet.getRange(1, 1).setValue(year + ' Completed Lodge Orders')
+      .offset(0,  12).setValue('- ' + year + ' Order Total')
+      .offset(2, -12, lodgeCompletedSheet.getMaxRows() - 2, lodgeCompletedSheet.getLastColumn()).clearContent()
+    guideCompletedSheet.getRange(1, 1).setValue(year + ' Completed Guide Orders')
+      .offset(0,  12).setValue('- ' + year + ' Order Total')
+      .offset(2, -12, guideCompletedSheet.getMaxRows() - 2, guideCompletedSheet.getLastColumn()).clearContent()
+    cancelledSheet.getRange(1, 1).setValue(year + ' Cancelled Orders')
+      .offset(0,  12).setValue('- ' + year + ' Order Total')
+      .offset(2, -12, cancelledSheet.getMaxRows() - 2, cancelledSheet.getLastColumn()).clearContent()
+    boSheet.getRange(1, 1).setValue(year + ' Back Order Items')
+      .offset(0,  11).setValue('- ' + year + ' Back Order Total')
+      .offset(2, -11, boSheet.getMaxRows() - 2, numCols).clearContent()
+    ioSheet.getRange(1, 1).setValue(year + ' Initial Order Items')
+      .offset(0,  11).setValue('- ' + year + ' Initial Order Total')
+      .offset(2, -11, ioSheet.getMaxRows() - 2, numCols).clearContent()
+    poSheet.getRange(1, 1).setValue(year + ' Purchase Order Items')
+      .offset(0,  7).setValue('- ' + year + ' Purchase Order Total')
+      .offset(2, -7, poSheet.getMaxRows() - 2, poSheet.getLastColumn()).clearContent()
+    recdSheet.getRange(1, 1).setValue(year + ' Received Items')
+      .offset(0,  7).setValue('- ' + year + ' Received Purchase Order Total')
+      .offset(2, -7, recdSheet.getMaxRows() - 2, recdSheet.getLastColumn()).clearContent()
+    invdSheet.getRange(1, 1).setValue(year + ' Invoiced Items')
+      .offset(0,  7).setValue('- ' + year + ' Invoiced Order Total')
+      .offset(2, -7, invdSheet.getMaxRows() - 2, invdSheet.getLastColumn()).clearContent()
+    chartDataSheet.getRange(1, 2, 1, 8).setValues([[year, year - 1, year - 2, year - 3, year - 4, year - 5, year - 6, year - 7]])
+      .offset(1, 0, chartDataSheet.getLastRow() - 1, 10).setValue(0)
+
+    itemManagementSheet.getRangeList(['G2:G', 'I2:I', 'K2:L', 'N2:N']).clearContent()
+    
     SpreadsheetApp.flush();
-    SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 2.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+    SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
   }
 }
 
