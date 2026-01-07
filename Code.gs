@@ -75,7 +75,7 @@ function onChange(e)
 }
 
 /**
- * This function checks to see if a user is moving a row from one sheet to another.
+ * This function manages the simple onEdit events from the spreadsheet, including moving rows from one sheet to another, price changes, and managing document numbers on the Item Management sheet.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -103,7 +103,7 @@ function onEdit(e)
 }
 
 /**
- * This function checks to see if a user is moving a row from one sheet to another.
+ * This function handles the simple onOpen events, specifically when a brand new spreadsheet is created for the new year, a menu item appears prompting the user to create new triggers.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -119,7 +119,8 @@ function onOpen(e)
 }
 
 /**
- * This function checks to see if a user is moving a row from one sheet to another.
+ * This function is an installed trigger and it handles the onOpen events. This includes prompting the user through menu items to create a new spreadsheet at the end of a season and
+ * moving rows from the old tracker to the new one. This function also handles the updating of item and transfer sheet links.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -653,6 +654,7 @@ function createNewLodgeTracker()
     const poSheet = newSpreadsheet.getSheetByName('P/O')
     const recdSheet = newSpreadsheet.getSheetByName("Rec'd")
     const invdSheet = newSpreadsheet.getSheetByName("Inv'd")
+    const chartSheet = newSpreadsheet.getSheetByName("Weekly Sales");
     const chartDataSheet = newSpreadsheet.getSheetByName('Chart Data')
     const itemManagementSheet = newSpreadsheet.getSheetByName('Item Management (Jarren Only ;)')
     const numCols = boSheet.getLastColumn();
@@ -691,6 +693,19 @@ function createNewLodgeTracker()
       .offset(1, 0, chartDataSheet.getLastRow() - 1, 10).setValue(0)
 
     itemManagementSheet.getRangeList(['G2:G', 'I2:I', 'K2:L', 'N2:N']).clearContent()
+
+    // DOES NOT WORK
+    // // This changes legend text of the chart to ensure the labels start with the current year
+    // chartSheet.updateChart(chartSheet.getCharts()[0].modify().setOption("series", {
+    //   0: { labelInLegend: year     },
+    //   1: { labelInLegend: year - 1 },
+    //   2: { labelInLegend: year - 2 },
+    //   3: { labelInLegend: year - 3 },
+    //   4: { labelInLegend: year - 4 },
+    //   5: { labelInLegend: year - 5 },
+    //   6: { labelInLegend: year - 6 },
+    //   7: { labelInLegend: year - 7 }
+    // }).build());
     
     SpreadsheetApp.flush();
     SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
@@ -2918,7 +2933,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
       return ord[orderNumIdx]
     }).flat().filter(ordNum => isNotBlank(ordNum)); 
 
-    const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
+    const currentLodgeOrders = (numLodgeOrders > 0) ? lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14)
       .filter(currentOrd => {
 
         isLodgeOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
@@ -2931,9 +2946,9 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         }
           
         return !isLodgeOrderCancelled;
-    });
+    }) : [];
 
-    const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14)
+    const currentCharterGuideOrders = (numCharterGuideOrders > 0) ? charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14)
       .filter(currentOrd => {
 
         isCharterGuideOrderCancelled = !isBlank(currentOrd[2]) && !currentOrderNumbers.includes(currentOrd[2]);
@@ -2946,7 +2961,7 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         }
           
         return !isCharterGuideOrderCancelled;
-    });
+    }) : [];
 
     var numCancelledOrders = cancelledOrders.length;
     var numCurrentLodgeOrders = currentLodgeOrders.length;
@@ -3104,10 +3119,12 @@ function updatedPntReceivingSpreadsheet()
   const spreadsheet = SpreadsheetApp.getActive();
   const poItemsSheet = spreadsheet.getSheetByName('P/O') 
   const recdItemsSheet = spreadsheet.getSheetByName("Rec'd")
-  const numCols_PoSheet = poItemsSheet.getLastColumn();
+  const numRows_RecdSheet = recdItemsSheet.getLastRow() - 2;
+  const numRows_PoSheet   = poItemsSheet.getLastRow() - 2;
+  const numCols_PoSheet   = poItemsSheet.getLastColumn();
   const numCols_RecdSheet = recdItemsSheet.getLastColumn();
-  const header_PoSheet = poItemsSheet.getSheetValues(2, 1, 1, numCols_PoSheet)[0];
-  const header_RecdSheet = recdItemsSheet.getSheetValues(2, 1, 1, numCols_RecdSheet)[0];
+  const header_PoSheet    = poItemsSheet.getSheetValues(2, 1, 1, numCols_PoSheet)[0];
+  const header_RecdSheet  = recdItemsSheet.getSheetValues(2, 1, 1, numCols_RecdSheet)[0];
   const orderDateIdx_PoSheet = header_PoSheet.indexOf('Order Date')
   const    vendorIdx_PoSheet = header_PoSheet.indexOf('Vendor')
   const  poNumberIdx_PoSheet = header_PoSheet.indexOf('Purchase Order #')
@@ -3122,21 +3139,29 @@ function updatedPntReceivingSpreadsheet()
   const tritesPackingSlips_PoNumbersNotReceived = tritesPackingSlipsSheet.getSheetValues(3, 3, numRows, 2)
     .filter(poNum => !isBlank(poNum[0]) && isBlank(poNum[1])).map(poNum => poNum[0]) // PO number is not blank while the receipt number is blank
 
-  const posAndReceipts = poItemsSheet.getSheetValues(3, 1, poItemsSheet.getLastRow() - 2, numCols_PoSheet)                   // All PO items
-      .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
-      .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
-    .concat(recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
+  const posAndReceipts = 
+    (numRows_PoSheet > 0) ? 
+      (numRows_RecdSheet > 0) ? poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
+        .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
+        .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+        .concat(recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
+          .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
+          .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
+        ).filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) : 
+      poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
+        .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
+        .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+        .filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) :
+    (numRows_RecdSheet > 0) ? recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
       .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
       .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
-    ).filter(rctNum => 
-      !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) ||                                                   // Remove receipts that are already on the list
-      (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2])) // Remove pos that are already on the list
-  )
+      .filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) :
+    [];
 
   const numNewPosAndReceipts = posAndReceipts.length;
 
   if (numNewPosAndReceipts > 0)
-    tritesPackingSlipsSheet.getRange(lastRow + 1, 1, numNewPosAndReceipts, 7).setValues(posAndReceipts).offset(-1*numRows - 1, 0, numRows + numNewPosAndReceipts + 1, 7).sort([{column: 1, ascending: false}]);
+    tritesPackingSlipsSheet.getRange(lastRow + 1, 1, numNewPosAndReceipts, 7).setValues(posAndReceipts).offset(-1*numRows, 0, numRows + numNewPosAndReceipts + 1, 7).sort([{column: 1, ascending: false}]);
 }
 
 /**
