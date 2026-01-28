@@ -3135,33 +3135,37 @@ function updatedPntReceivingSpreadsheet()
   const tritesPackingSlipsSheet = SpreadsheetApp.openById('1qzyTAmtVIfOCxuhv0KzBkHpnWXFqE79DpnJSAqnZyvk').getSheetByName('Trites Packing slips')
   const lastRow = tritesPackingSlipsSheet.getLastRow();
   const numRows = lastRow - 2;
-  const tritesPackingSlips_ReceiptNumbers = tritesPackingSlipsSheet.getSheetValues(3, 4, numRows, 1).flat()
-  const tritesPackingSlips_PoNumbersNotReceived = tritesPackingSlipsSheet.getSheetValues(3, 3, numRows, 2)
-    .filter(poNum => !isBlank(poNum[0]) && isBlank(poNum[1])).map(poNum => poNum[0]) // PO number is not blank while the receipt number is blank
 
-  const posAndReceipts = 
-    (numRows_PoSheet > 0) ? 
-      (numRows_RecdSheet > 0) ? poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
-        .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
-        .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
-        .concat(recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
-          .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
-          .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
-        ).filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) : 
-      poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
-        .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
-        .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+  if (numRows > 0)
+  {
+    const tritesPackingSlips_ReceiptNumbers = tritesPackingSlipsSheet.getSheetValues(3, 4, numRows, 1).flat()
+    const tritesPackingSlips_PoNumbersNotReceived = tritesPackingSlipsSheet.getSheetValues(3, 3, numRows, 2)
+      .filter(poNum => !isBlank(poNum[0]) && isBlank(poNum[1])).map(poNum => poNum[0]) // PO number is not blank while the receipt number is blank
+
+    const posAndReceipts = 
+      (numRows_PoSheet > 0) ? 
+        (numRows_RecdSheet > 0) ? poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
+          .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
+          .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+          .concat(recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
+            .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
+            .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
+          ).filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) : 
+        poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet)                   // All PO items
+          .filter((row, index, arr) => arr.findIndex(row2 => row2[poNumberIdx_PoSheet] === row[poNumberIdx_PoSheet]) >= index)   // Keep the unique PO numbers
+          .map(newPos => [newPos[orderDateIdx_PoSheet], newPos[vendorIdx_PoSheet], newPos[poNumberIdx_PoSheet], '', '', '', '']) // Map to the correct format
+          .filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) :
+      (numRows_RecdSheet > 0) ? recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
+        .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
+        .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
         .filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) :
-    (numRows_RecdSheet > 0) ? recdItemsSheet.getSheetValues(3, 1, recdItemsSheet.getLastRow() - 2, numCols_RecdSheet)                                                                  // All Received items
-      .filter((row, index, arr) => arr.findIndex(row2 => row2[receiptNumberIdx_RecdSheet] === row[receiptNumberIdx_RecdSheet]) >= index)                             // Keep the unique Receipt numbers
-      .map(newPos => [newPos[receiptDateIdx_RecdSheet], newPos[vendorIdx_RecdSheet], newPos[poNumberIdx_RecdSheet], newPos[receiptNumberIdx_RecdSheet], '', '', '']) // Map to the correct format
-      .filter(rctNum => !tritesPackingSlips_ReceiptNumbers.includes(rctNum[3]) || (isBlank(rctNum[3]) && !isBlank(rctNum[2]) && !tritesPackingSlips_PoNumbersNotReceived.includes(rctNum[2]))) :
-    [];
+      [];
 
-  const numNewPosAndReceipts = posAndReceipts.length;
+    const numNewPosAndReceipts = posAndReceipts.length;
 
-  if (numNewPosAndReceipts > 0)
-    tritesPackingSlipsSheet.getRange(lastRow + 1, 1, numNewPosAndReceipts, 7).setValues(posAndReceipts).offset(-1*numRows, 0, numRows + numNewPosAndReceipts + 1, 7).sort([{column: 1, ascending: false}]);
+    if (numNewPosAndReceipts > 0)
+      tritesPackingSlipsSheet.getRange(lastRow + 1, 1, numNewPosAndReceipts, 7).setValues(posAndReceipts).offset(-1*numRows, 0, numRows + numNewPosAndReceipts + 1, 7).sort([{column: 1, ascending: false}]);
+  }
 }
 
 /**
@@ -3468,7 +3472,9 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
     itemManagement_Po_Range.clearContent().offset(0, 0, itemManagement_Po_Updated.length).setValues(itemManagement_Po_Updated);
 
     const itemManagement_NonLodgePo_Updated = itemManagement_NonLodgePo.filter(u => u).sort().map(v => [v]);
-    itemManagement_NonLodgePo_Range.clearContent().offset(0, 0, itemManagement_NonLodgePo_Updated.length).setValues(itemManagement_NonLodgePo_Updated);
+
+    if (itemManagement_NonLodgePo_Updated.length > 0)
+      itemManagement_NonLodgePo_Range.clearContent().offset(0, 0, itemManagement_NonLodgePo_Updated.length).setValues(itemManagement_NonLodgePo_Updated);
 
     if (numItemsOnPos > 0)
     {
