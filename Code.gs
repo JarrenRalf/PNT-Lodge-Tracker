@@ -1013,7 +1013,7 @@ function establishItemLinks_INVD(invdSheet, ...sheets)
  * 
  * @param {Spreadsheet} spreadsheet : The active spreadsheet.
  * @param {Sheet[]}       sheets    : An array of sheets, assumed to be the two order sheets
- * @return {Sheet[]} Returns the bo, io, po, and invd sheets.
+ * @return {Sheet[]} Returns the bo, io, po, recd, and invd sheets.
  * @author Jarren Ralf 
  */
 function establishItemLinks_IO_BO(spreadsheet, ...sheets)
@@ -1157,7 +1157,8 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
       purchaseOrderNumbers = notesRange.getRichTextValues().map((noteValues, sku) => {
 
         notes = noteValues[0].getText();
-        isPoNumInNotes = notes.match(/PO0\d{5}/); // match 5-digit number
+        isPoNumInNotes      = notes.match(/PO0\d{5}/); // match 5-digit number
+        isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
         poNumber = '', row_PO = -1, row_RECD = -1;
         
         if (isPoNumInNotes)
@@ -1166,7 +1167,6 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
           startIndex = notes.indexOf(poNumber);
           endIndex = startIndex + poNumber.length;
           row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] == poNumber && po[0] == skus[sku][0]) + 3 : -1;
-          isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
 
           if (isReceiptNumInNotes) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
           {
@@ -1191,6 +1191,13 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
                         .setLinkUrl(endOfPoNum + 1, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()];
             }
           }
+        }
+        else if (isReceiptNumInNotes)
+        {
+          receiptNumber = isReceiptNumInNotes[0];
+          startIndex = notes.indexOf(receiptNumber);
+          endIndex = startIndex + receiptNumber.length;
+          row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == receiptNumber && rct[0] == skus[sku][0]) + 3 : -1;
         }
 
         return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':L' + row_PO  ).build()] : 
@@ -3386,7 +3393,7 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
   const itemManagement_NonLodgePo_Range = itemManagementSheet.getRange(2, 9, itemManagement_NumRows, 1);
   const itemManagement_NonLodgePo = itemManagement_NonLodgePo_Range.getValues().filter(v => !isBlank(v[0])).flat();
   const currentYear = new Date().getFullYear().toString();
-  const lastYear = new Date().getFullYear().toString();
+  const    lastYear = new Date().getFullYear().toString();
   const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
   const templateSheet = spreadsheet.getSheetByName('Reupload:');
   var numPOsAdded = 0, numPOsRemoved = 0, itemManagement_Po_Idx = -1, itemManagement_NonLodgePo_Idx = -1, isThisPoNumberRemovedFromItemsSheet, reuploadSheet;
@@ -3409,17 +3416,19 @@ function updatePurchaseOrdersOnTracker(allPurchaseOrders, spreadsheet)
 
       if (allPurchaseOrders[i][poStatusIdx] !== 'PO Completed')
       {
-        if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx]) && !itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
+        if (!itemManagement_Po.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in the lodge item management PO list
         {
-          Logger.log('Add this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
-          itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
-          numPOsAdded++;
+          if (!itemManagement_NonLodgePo.includes(allPurchaseOrders[i][poNumberIdx])) // This PO is not in either item managment PO list
+          {
+            Logger.log('Add this PO to Item Management List: ' + allPurchaseOrders[i][poNumberIdx])
+            itemManagement_Po.push(allPurchaseOrders[i][poNumberIdx]) // Add the PO number to the item management po list
+            numPOsAdded++;
+          }
         }
-        else if (allPurchaseOrders[i][poStatusIdx]  === 'PO Part Received' && allPurchaseOrders[i][totalValueIdx] != 0 && numItemsOnPos > 0 &&
-          !(Math.round((poItems.filter(poNum => poNum[9] == allPurchaseOrders[i][poNumberIdx]).map(amount => Number(amount[7])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % 
-          Number(allPurchaseOrders[i][totalValueIdx]) === 0)) 
+        else if (allPurchaseOrders[i][totalValueIdx] != 0 && numItemsOnPos > 0 && Math.round((poItems.filter(poNum => poNum[9] == allPurchaseOrders[i][poNumberIdx])
+          .map(amount => Number(amount[7])).reduce((total, amount) => total + amount, 0) + Number.EPSILON)*100)/100 % Number(allPurchaseOrders[i][totalValueIdx]))
         {
-          Logger.log('This PO is partially received: ' + allPurchaseOrders[i][poNumberIdx] + '. The items on this order need to be imported again.')
+          Logger.log('The total value of this PO has changed: ' + allPurchaseOrders[i][poNumberIdx] + '. The items on this order need to be imported again.')
 
           reuploadSheet = spreadsheet.insertSheet('Reupload:' + allPurchaseOrders[i][poNumberIdx], {template: templateSheet}).hideSheet();
 
