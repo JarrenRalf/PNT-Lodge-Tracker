@@ -713,7 +713,7 @@ function createNewLodgeTracker()
 }
 
 /**
- * This function finds items with on the B/O tab that matches the given order number and deletes them.
+ * This function finds items on the B/O tab that matches the given order number and deletes them.
  * 
  * @param {String || String[][]} orderNumber       : The order number of the current order being updated on the ORDERS page.
  * @param {Spreadsheet}          spreadsheet       : The active spreadsheet
@@ -742,11 +742,11 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
     {
       orderNumber.map(ordNum => {
 
-        if (!isBlank(ordNum[2]))
+        if (!isBlank(ordNum[2])) // Order number is not blank
         {
           isLodgeOrderComplete = listOfOrderCompletionStatus.find(partialOrd => partialOrd[0] == ordNum[2])
 
-          if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
+          if (isLodgeOrderComplete)
           {
             boSheet_NumRows = boSheet.getLastRow() - 2;
             ioSheet_NumRows = ioSheet.getLastRow() - 2;
@@ -759,12 +759,16 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
               if (row !== -1)
               {
-                numRows = Number(ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2])) - row + 1;
-                itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
+                if (isLodgeOrderComplete[1] !== 'Yes')
+                {
+                  itemsOnOrder = ioItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
 
-                if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
-                  spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                    .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
+                  if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
+                    spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                      .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
+                }
+                
+                numRows = Number(ioItems.findLastIndex(ordNum_IO => ordNum_IO[10] == ordNum[2])) - row + 1;
 
                 Logger.log('Found ORD# ' + ordNum[2] + ' on the I/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
@@ -777,12 +781,16 @@ function deleteBackOrderedItems(orderNumber, spreadsheet, listOfOrderCompletionS
 
                 if (row !== -1)
                 {
-                  numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
-                  itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
+                  if (isLodgeOrderComplete[1] !== 'Yes')
+                  {
+                    itemsOnOrder = boItems.filter(item => item[10] == ordNum[2]).map(item => [item[5], item[11], item[12], ''])
 
-                  if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
-                    spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
-                      .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
+                    if (itemsOnOrder.some(row => isNotBlank(row[1]) || isNotBlank(row[2]) || isNotBlank(row[3])))
+                      spreadsheet.insertSheet('Reupload:' + ordNum[2], {template: templateSheet}).hideSheet()
+                        .getRange(2, 1, itemsOnOrder.length, 4).setNumberFormat('@').setValues(itemsOnOrder)
+                  }
+                  
+                  numRows = boItems.findLastIndex(ordNum_BO => ordNum_BO[10] == ordNum[2]) - row + 1;
 
                   Logger.log('Found ORD# ' + ordNum[2] + ' on the B/O sheet. Will delete ' + numRows + ' row(s) starting at row ' + (row + 3));
 
