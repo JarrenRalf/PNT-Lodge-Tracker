@@ -313,12 +313,12 @@ function addItemsToTransferSheet()
             numRuns = richText_Runs.length
 
             if (isNotBlank(fullText))
-              for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + linkToTransferSheetText); i < numRuns; i++)
-                richTextBuilder.setTextStyle(richText_Runs[i][0], richText_Runs[i][1], richText_Runs[i][2]);
+              for (var i = 0, richTextBuilder_Notes = SpreadsheetApp.newRichTextValue().setText(fullText + linkToTransferSheetText); i < numRuns; i++)
+                richTextBuilder_Notes.setTextStyle(richText_Runs[i][0], richText_Runs[i][1], richText_Runs[i][2]);
             else
               return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(urlToTransferSheet).build()];
 
-            return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + linkToTransferSheetText.length, urlToTransferSheet).build()];
+            return [richTextBuilder_Notes.setLinkUrl(fullTextLength + 1, fullTextLength + linkToTransferSheetText.length, urlToTransferSheet).build()];
           })
           
           range.setRichTextValues(richText).setBackgrounds(range.getBackgrounds());
@@ -520,12 +520,12 @@ function addOrdersToTransferSheet()
           numRuns = richText_Notes_Runs.length;
 
           if (!isBlank(fullText))
-            for (var i = 0, richTextBuilder = SpreadsheetApp.newRichTextValue().setText(fullText + linkToTransferSheetText); i < numRuns; i++)
-              richTextBuilder.setTextStyle(richText_Notes_Runs[i][0], richText_Notes_Runs[i][1], richText_Notes_Runs[i][2])
+            for (var i = 0, richTextBuilder_Notes = SpreadsheetApp.newRichTextValue().setText(fullText + linkToTransferSheetText); i < numRuns; i++)
+              richTextBuilder_Notes.setTextStyle(richText_Notes_Runs[i][0], richText_Notes_Runs[i][1], richText_Notes_Runs[i][2])
           else 
             return [SpreadsheetApp.newRichTextValue().setText('Shipping from ' + fromLocation + ' to ' + toLocation).setLinkUrl(urlToTransferSheet).build()]
           
-          return [richTextBuilder.setLinkUrl(fullTextLength + 1, fullTextLength + linkToTransferSheetText.length, urlToTransferSheet).build()];
+          return [richTextBuilder_Notes.setLinkUrl(fullTextLength + 1, fullTextLength + linkToTransferSheetText.length, urlToTransferSheet).build()];
         });
 
         rng.setRichTextValues(richText_Notes).setBackgrounds(rng.getBackgrounds());
@@ -1045,13 +1045,13 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
     ioSheet.getRange(2, 1, ioSheet_NumRowsPlusHeader, numCols).createFilter().sort(11, true); // Create a filter in the header and sort by the order number
   SpreadsheetApp.flush();
   
-  const orderNumbersAndSku_BO   = (  boSheet_NumRows > 0) ?   boSheet.getSheetValues(3, 6,   boSheet_NumRows, 6) : null;
-  const orderNumbersAndSku_IO   = (  ioSheet_NumRows > 0) ?   ioSheet.getSheetValues(3, 6,   ioSheet_NumRows, 6) : null;
+  const orderNumbersAndSku_BO   = (  boSheet_NumRows > 0) ?   boSheet.getSheetValues(3, 3,   boSheet_NumRows, 9) : null;
+  const orderNumbersAndSku_IO   = (  ioSheet_NumRows > 0) ?   ioSheet.getSheetValues(3, 3,   ioSheet_NumRows, 9) : null;
   const orderNumbersAndSku_INVD = (invdSheet_NumRows > 0) ? invdSheet.getSheetValues(3, 6, invdSheet_NumRows, 6) : null;
   const   boSheetId =   boSheet.getSheetId();
   const   ioSheetId =   ioSheet.getSheetId();
   const invdSheetId = invdSheet.getSheetId();
-  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, row_invd, orderNumbersInNotes, richTextBuilder, startIndex, endIndex, notes;
+  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, row_invd, orderNumbersInNotes, richTextBuilder_Notes, richTextBuilder_Customer, startIndex, endIndex, notes;
 
   sheets.map(sheet => {
 
@@ -1063,15 +1063,15 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
       orderNumbers = range.getRichTextValues().map(ordNum => {
         orderNumber = ordNum[0].getText();
-        row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[5] == orderNumber) + 3 : -1;
+        row_io = (orderNumbersAndSku_IO) ? orderNumbersAndSku_IO.findIndex(ord => ord[8] == orderNumber) + 3 : -1;
 
         if (row_io > 2)
-          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':M' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()]      
+          return [ordNum[0].copy().setLinkUrl('#gid=' + ioSheetId + '&range=A' + row_io + ':M' + (orderNumbersAndSku_IO.findLastIndex(ord => ord[8] == orderNumber) + 3)).build()]      
         else if (orderNumbersAndSku_BO) // Make sure there are back order items on the list
         {
-          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[5] == orderNumber) + 3;
+          row_bo = orderNumbersAndSku_BO.findIndex(ord => ord[8] == orderNumber) + 3;
         
-          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':M' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[5] == orderNumber) + 3)).build()] : ordNum;
+          return (row_bo > 2) ? [ordNum[0].copy().setLinkUrl('#gid=' + boSheetId + '&range=A' + row_bo + ':M' + (orderNumbersAndSku_BO.findLastIndex(ord => ord[8] == orderNumber) + 3)).build()] : ordNum;
         }
         else 
           return ordNum;
@@ -1084,7 +1084,7 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   if (poSheet_NumRows > 0)
   {
     const skus = poSheet.getSheetValues(3, 5, poSheet_NumRows, 1)
-    range = poSheet.getRange(3, 11, poSheet_NumRows, 1)
+    range = poSheet.getRange(3, 11, poSheet_NumRows, 2)
 
     orderNumbers = range.getRichTextValues().map((noteValues, sku) => {
 
@@ -1093,26 +1093,36 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
       if (orderNumbersInNotes.length > 0) // If there are order numbers in the notes
       {
-        richTextBuilder = noteValues[0].copy();
+        richTextBuilder_Notes    = noteValues[0].copy();
+        richTextBuilder_Customer = noteValues[1].copy();
 
         orderNumbersInNotes.map(ordNum => {
           orderNumber = ordNum[0];
           startIndex = notes.indexOf(orderNumber);
           endIndex = startIndex + orderNumber.length;
-          row_bo   = (orderNumbersAndSku_BO)   ?   orderNumbersAndSku_BO.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
-          row_io   = (orderNumbersAndSku_IO)   ?   orderNumbersAndSku_IO.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
-          row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[5] == orderNumber && ord[0] == skus[sku][0]) + 3 : -1;
+          row_bo   = (orderNumbersAndSku_BO)   ?   orderNumbersAndSku_BO.findIndex(ord => ord[8] == orderNumber && ord[3] == skus[sku][0]) + 3 : -1;
+          row_io   = (orderNumbersAndSku_IO)   ?   orderNumbersAndSku_IO.findIndex(ord => ord[8] == orderNumber && ord[3] == skus[sku][0]) + 3 : -1;
+          row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[9] == orderNumber && ord[4] == skus[sku][0]) + 3 : -1;
 
           if (row_bo > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':M' + row_bo)
+          {
+            richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':M' + row_bo);
+            richTextBuilder_Customer.setText(orderNumbersAndSku_BO[row_bo - 3][0]);
+          }
           else if (row_io > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':M' + row_io)
+          {
+            richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':M' + row_io);
+            richTextBuilder_Customer.setText(orderNumbersAndSku_IO[row_io - 3][0]);
+          }
           else if (row_invd > 2)
-            richTextBuilder.setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + row_invd)
-              .setTextStyle(startIndex, endIndex, SpreadsheetApp.newTextStyle().setForegroundColor('#b45f06').setUnderline(true).build())
+          {
+            richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + row_invd)
+              .setTextStyle(startIndex, endIndex, SpreadsheetApp.newTextStyle().setForegroundColor('#b45f06').setUnderline(true).build());
+            richTextBuilder_Customer.setText(orderNumbersAndSku_INVD[row_invd - 3][0]);
+          }
         })
 
-        return [richTextBuilder.build()];
+        return [richTextBuilder_Notes.build(), richTextBuilder_Customer.build()];
       }
       else // No order numbers in the notes
         return noteValues;
@@ -1867,7 +1877,7 @@ function setColumnWidths()
 function setItemLinks(lodgeOrdersSheet, spreadsheet)
 {
   spreadsheet.toast('Order and Invoice # hyperlinks being established...', '', -1)
-  const guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
+  const    guideOrdersSheet = spreadsheet.getSheetByName('GUIDE ORDERS');
   const lodgeCompletedSheet = spreadsheet.getSheetByName('LODGE COMPLETED');
   const guideCompletedSheet = spreadsheet.getSheetByName('GUIDE COMPLETED');
 
@@ -1889,7 +1899,7 @@ function setItemLinks(lodgeOrdersSheet, spreadsheet)
 function setTransferSheetLinks(spreadsheet, ...sheets)
 {
   var numRows, notesRange, orderNumbers, invoiceNumbers, note, noteLength = 0, numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, 
-    numLinksFromRupert = 1, rangeLink = [], richTextBuilder, noteSplit, locations, ss, url, itemsToRichmondSheet, orderSheet, shippedSheet, receivedSheet, gid;
+    numLinksFromRupert = 1, rangeLink = [], richTextBuilder_Notes, noteSplit, locations, ss, url, itemsToRichmondSheet, orderSheet, shippedSheet, receivedSheet, gid;
 
   sheets.map(sheet => {
 
@@ -1909,7 +1919,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
           if (note.includes("Shipping from"))
           {
             numLinksToParksille = 1, numLinksToRupert = 1, numLinksFromParksille = 1, numLinksFromRupert = 1, rangeLink.length = 0, noteLength = 0;
-            richTextBuilder = SpreadsheetApp.newRichTextValue().setText(note);
+            richTextBuilder_Notes = SpreadsheetApp.newRichTextValue().setText(note);
             noteSplit = note.split('\n');
 
             richText = noteSplit.map(run => {
@@ -1939,7 +1949,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                           for (var i = 1; i < numLinksToParksille; i++)
                             rangeLink.pop()
 
-                          richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                          richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                         }
                         else
                         {
@@ -1951,7 +1961,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                             for (var i = 1; i < numLinksToParksille; i++)
                               rangeLink.pop()
 
-                            richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                            richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                           }
                           else
                           {
@@ -1966,7 +1976,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                               for (var i = 1; i < numLinksToParksille; i++)
                                 rangeLink.pop()
 
-                              richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                              richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                             }
                             else
                             {
@@ -1978,7 +1988,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                 for (var i = 1; i < numLinksToParksille; i++)
                                   rangeLink.pop()
 
-                                richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                               }
                               else
                               {
@@ -1993,7 +2003,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                   for (var i = 1; i < numLinksToParksille; i++)
                                     rangeLink.pop()
 
-                                  richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                  richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                                 }
                                 else
                                 {
@@ -2005,7 +2015,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                     for (var i = 1; i < numLinksToParksille; i++)
                                       rangeLink.pop()
 
-                                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                    richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                                   } 
                                 }
                               }
@@ -2030,7 +2040,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                           for (var i = 1; i < numLinksToRupert; i++)
                             rangeLink.pop()
 
-                          richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                          richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                         }
                         else
                         {
@@ -2042,7 +2052,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                             for (var i = 1; i < numLinksToRupert; i++)
                               rangeLink.pop()
 
-                            richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                            richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                           }
                           else
                           {
@@ -2057,7 +2067,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                               for (var i = 1; i < numLinksToRupert; i++)
                                 rangeLink.pop()
 
-                              richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                              richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                             }
                             else
                             {
@@ -2069,7 +2079,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                 for (var i = 1; i < numLinksToRupert; i++)
                                   rangeLink.pop()
 
-                                richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                               }
                               else
                               {
@@ -2084,7 +2094,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                   for (var i = 1; i < numLinksToRupert; i++)
                                     rangeLink.pop()
 
-                                  richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                  richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                                 }
                                 else
                                 {
@@ -2096,7 +2106,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                                     for (var i = 1; i < numLinksToRupert; i++)
                                       rangeLink.pop()
 
-                                    richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
+                                    richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, rangeLink.pop())
                                   } 
                                 }
                               }
@@ -2121,7 +2131,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                       for (var i = 1; i < numLinksFromParksille; i++)
                         rangeLink.pop()
 
-                      richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                      richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                     }
                     else 
                     {
@@ -2133,7 +2143,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                         for (var i = 1; i < numLinksFromParksille; i++)
                           rangeLink.pop()
 
-                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                        richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                       }
                     }
 
@@ -2152,7 +2162,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                       for (var i = 1; i < numLinksFromRupert; i++)
                         rangeLink.pop()
 
-                      richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                      richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                     }
                     else 
                     {
@@ -2164,7 +2174,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
                         for (var i = 1; i < numLinksFromRupert; i++)
                           rangeLink.pop()
 
-                        richTextBuilder.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
+                        richTextBuilder_Notes.setLinkUrl(noteLength, noteLength + run.length, url + '?gid=' + gid + '#gid=' + gid + rangeLink.pop())
                       }
                     }
 
@@ -2176,7 +2186,7 @@ function setTransferSheetLinks(spreadsheet, ...sheets)
               noteLength += run.length + 1;
             })
             
-            return [richTextBuilder.build()];
+            return [richTextBuilder_Notes.build()];
           }
 
           return richText
