@@ -25,7 +25,7 @@ function onChange(e)
           nCols,
           sheets[sheet].getMaxRows(),
           sheets[sheet].getMaxColumns(),
-          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Order Complete?')        : false, // There is a sheet with no rows and no columns
+          (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Order Complete?')        : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Automatic Style Code')   : false,
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Receipt Date')           : false, 
           (nRows > 0 && nCols > 0) ? sheets[sheet].getSheetValues(1, 1, 1, nCols).flat().includes('Rcpt #')                 : false,
@@ -37,9 +37,10 @@ function onChange(e)
         ]
 
         // A new sheet is imported by File -> Import -> Insert new sheet(s) - The left disjunct is for a csv and the right disjunct is for an excel file
-        if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && info[numCols] !== 0) || 
-            ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && 
-            (info[isAdagioOE] || info[isAdagioPO] || info[isAdagioPO_Receipts] || info[isBackOrderItems] || info[isPurchaseOrderItems] || info[isReceivedItems] || info[isInvoicedItems]))) 
+        if ((info[maxRow] - info[numRows] === 2 && info[maxCol] - info[numCols] === 2) || (info[maxRow] === 1000 && info[maxCol] === 26 && info[numRows] !== 0 && 
+             info[numCols] !== 0) || ((info[maxRow] === info[numRows] && (info[maxCol] === info[numCols] || info[maxCol] == 26)) && 
+            (info[isAdagioOE] || info[isAdagioPO] || info[isAdagioPO_Receipts] || info[isBackOrderItems] || info[isPurchaseOrderItems] || 
+             info[isReceivedItems] || info[isInvoicedItems]))) 
         {
           spreadsheet.toast('Processing imported data...', '', 60)
           SpreadsheetApp.flush();
@@ -75,7 +76,8 @@ function onChange(e)
 }
 
 /**
- * This function manages the simple onEdit events from the spreadsheet, including moving rows from one sheet to another, price changes, and managing document numbers on the Item Management sheet.
+ * This function manages the simple onEdit events from the spreadsheet, including moving rows from one sheet to another, price changes, and 
+ * managing document numbers on the Item Management sheet.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -103,7 +105,8 @@ function onEdit(e)
 }
 
 /**
- * This function handles the simple onOpen events, specifically when a brand new spreadsheet is created for the new year, a menu item appears prompting the user to create new triggers.
+ * This function handles the simple onOpen events, specifically when a brand new spreadsheet is created for the new year, 
+ * a menu item appears prompting the user to create new triggers.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -119,8 +122,9 @@ function onOpen(e)
 }
 
 /**
- * This function is an installed trigger and it handles the onOpen events. This includes prompting the user through menu items to create a new spreadsheet at the end of a season and
- * moving rows from the old tracker to the new one. This function also handles the updating of item and transfer sheet links.
+ * This function is an installed trigger and it handles the onOpen events. This includes prompting the user through menu items to create a 
+ * new spreadsheet at the end of a season and moving rows from the old tracker to the new one. This function also handles the updating of 
+ * item and transfer sheet links.
  * 
  * @param {Event Object} e : The event object.
  */
@@ -140,7 +144,8 @@ function installedOnOpen(e)
   {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('Add selected rows to new Lodge Tracker').addItem('Add selected rows to new Lodge Tracker', 'addSelectedRowsToNewLodgeTracker').addToUi();
-    ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+    ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>')
+      .setWidth(250).setHeight(50), 'New Lodge Tracker');
   }
   else if (year !== currentTransferSheetYear) // If it is september or later and the current spreadsheet is not "next years" spreadsheet
   {
@@ -154,7 +159,8 @@ function installedOnOpen(e)
   SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Update Chart Data', 'getChartData').addToUi();
 
   [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
-  setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet, spreadsheet.getSheetByName('B/O'),  spreadsheet.getSheetByName('I/O'))
+  setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet,
+                        spreadsheet.getSheetByName('B/O'), spreadsheet.getSheetByName('I/O'))
 }
 
 /**
@@ -708,7 +714,8 @@ function createNewLodgeTracker()
     // }).build());
     
     SpreadsheetApp.flush();
-    SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>').setWidth(250).setHeight(50), 'New Lodge Tracker');
+    SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + url + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>')
+      .setWidth(250).setHeight(50), 'New Lodge Tracker');
   }
 }
 
@@ -1051,7 +1058,7 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
   const   boSheetId =   boSheet.getSheetId();
   const   ioSheetId =   ioSheet.getSheetId();
   const invdSheetId = invdSheet.getSheetId();
-  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, row_invd, orderNumbersInNotes, richTextBuilder_Notes, richTextBuilder_Customer, startIndex, endIndex, notes;
+  var numRows, range, orderNumbers, orderNumber, row_io, row_bo, row_invd, orderNumbersInNotes, richTextBuilder_Notes, customers, startIndex, endIndex, notes;
 
   sheets.map(sheet => {
 
@@ -1093,36 +1100,36 @@ function establishItemLinks_IO_BO(spreadsheet, ...sheets)
 
       if (orderNumbersInNotes.length > 0) // If there are order numbers in the notes
       {
-        richTextBuilder_Notes    = noteValues[0].copy();
-        richTextBuilder_Customer = noteValues[1].copy();
+        richTextBuilder_Notes = noteValues[0].copy();
+        customers = [];
 
         orderNumbersInNotes.map(ordNum => {
           orderNumber = ordNum[0];
-          startIndex = notes.indexOf(orderNumber);
-          endIndex = startIndex + orderNumber.length;
-          row_bo   = (orderNumbersAndSku_BO)   ?   orderNumbersAndSku_BO.findIndex(ord => ord[8] == orderNumber && ord[3] == skus[sku][0]) + 3 : -1;
-          row_io   = (orderNumbersAndSku_IO)   ?   orderNumbersAndSku_IO.findIndex(ord => ord[8] == orderNumber && ord[3] == skus[sku][0]) + 3 : -1;
-          row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[9] == orderNumber && ord[4] == skus[sku][0]) + 3 : -1;
+          startIndex = notes.indexOf(ordNum[0]);
+          endIndex = startIndex + ordNum[0].length;
+          row_bo   = (orderNumbersAndSku_BO)   ?   orderNumbersAndSku_BO.findIndex(ord => ord[8] == ordNum[0] && ord[3] == skus[sku][0]) + 3 : -1;
+          row_io   = (orderNumbersAndSku_IO)   ?   orderNumbersAndSku_IO.findIndex(ord => ord[8] == ordNum[0] && ord[3] == skus[sku][0]) + 3 : -1;
+          row_invd = (orderNumbersAndSku_INVD) ? orderNumbersAndSku_INVD.findIndex(ord => ord[9] == ordNum[0] && ord[4] == skus[sku][0]) + 3 : -1;
 
           if (row_bo > 2)
           {
             richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' +   boSheetId + '&range=A' + row_bo   + ':M' + row_bo);
-            richTextBuilder_Customer.setText(orderNumbersAndSku_BO[row_bo - 3][0]);
+            customers.push(orderNumbersAndSku_BO[row_bo - 3][0])
           }
           else if (row_io > 2)
           {
             richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' +   ioSheetId + '&range=A' + row_io   + ':M' + row_io);
-            richTextBuilder_Customer.setText(orderNumbersAndSku_IO[row_io - 3][0]);
+            customers.push(orderNumbersAndSku_IO[row_io - 3][0])
           }
           else if (row_invd > 2)
           {
             richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' + invdSheetId + '&range=A' + row_invd + ':M' + row_invd)
               .setTextStyle(startIndex, endIndex, SpreadsheetApp.newTextStyle().setForegroundColor('#b45f06').setUnderline(true).build());
-            richTextBuilder_Customer.setText(orderNumbersAndSku_INVD[row_invd - 3][0]);
+            customers.push(orderNumbersAndSku_INVD[row_invd - 3][0])
           }
         })
 
-        return [richTextBuilder_Notes.build(), richTextBuilder_Customer.build()];
+        return [richTextBuilder_Notes.build(), noteValues[1].copy().setText(customers.join('\n')).build()];
       }
       else // No order numbers in the notes
         return noteValues;
@@ -1161,7 +1168,7 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
   const     receiptNumbersAndSku_RECD = (recdSheet_NumRows > 0) ? recdSheet.getSheetValues(3, 6, recdSheet_NumRows, 7) : null;
   const   poSheetId =   poSheet.getSheetId()
   const recdSheetId = recdSheet.getSheetId()
-  var numRows, skus, notesRange, purchaseOrderNumbers, notes, isPoNumInNotes, poNumber, startIndex, endIndex, row_PO, isReceiptNumInNotes, receiptNumber, row_RECD, idx_RECD, endOfPoNum;
+  var numRows, skus, notesRange, purchaseOrderNumbers, notes, isPoNumInNotes, startIndex, endIndex, row_PO, isReceiptNumInNotes, richTextBuilder_Notes, receiptNumber, row_RECD, idx_RECD, endOfPoNum;
 
   sheets.map(sheet => {
 
@@ -1175,51 +1182,60 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
       purchaseOrderNumbers = notesRange.getRichTextValues().map((noteValues, sku) => {
 
         notes = noteValues[0].getText();
-        isPoNumInNotes      = notes.match(/PO0\d{5}/); // match 5-digit number
-        isReceiptNumInNotes = notes.match(/RC0\d{5}/); // match 5-digit number
-        poNumber = '', row_PO = -1, row_RECD = -1;
+        richTextBuilder_Notes = noteValues[0].copy()
+
+        isPoNumInNotes      = [...notes.matchAll(/PO0\d{5}/g)]; // match 5-digit number
+        isReceiptNumInNotes = [...notes.matchAll(/RC0\d{5}/g)]; // match 5-digit number
+
+        row_PO = -1, row_RECD = -1;
         
-        if (isPoNumInNotes)
+        if (isPoNumInNotes.length > 0) // If there are PO numbers in the notes
         {
-          poNumber = isPoNumInNotes[0];
-          startIndex = notes.indexOf(poNumber);
-          endIndex = startIndex + poNumber.length;
-          row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] == poNumber && po[0] == skus[sku][0]) + 3 : -1;
+          
+          isPoNumInNotes.map(poNum => {
 
-          if (isReceiptNumInNotes) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
-          {
-            receiptNumber = isReceiptNumInNotes[0];
-            startIndex = notes.indexOf(receiptNumber);
-            endIndex = startIndex + receiptNumber.length;
-            row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == receiptNumber && rct[0] == skus[sku][0]) + 3 : -1;
-          }
-          else if (row_PO <= 2) // There is no receipt number and the PO number is not found on the P/O sheet, therefore check if the item is on the Rec'd sheet
-          {
-            idx_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[5] == poNumber && rct[0] == skus[sku][0]) : -1;
+            startIndex = notes.indexOf(poNum[0]);
+            endIndex = startIndex + poNum[0].length;
+            row_PO   = (purchaseOrderNumbersAndSku_PO) ? purchaseOrderNumbersAndSku_PO.findIndex(po => po[5] == poNum[0] && po[0] == skus[sku][0]) + 3 : -1;
 
-            if (idx_RECD !== -1) // The item was found on the Rec'd page using the PO number, therefore add the RC number to the notes and hyperlink it
+            if (isReceiptNumInNotes.length > 0) // There is a receipt number in the notes, make sure the hyperlink is pointed to the correct row on the Rec'd page
             {
-              receiptNumber = receiptNumbersAndSku_RECD[idx_RECD][6];
-              endOfPoNum = startIndex + poNumber.length;
-              endIndex = endOfPoNum + receiptNumber.length + 1;
-              row_RECD = idx_RECD + 3;
-              
-              return [noteValues[0].copy()
-                        .setText(notes.slice(0, endOfPoNum) + (" " + receiptNumber) + notes.slice(endOfPoNum))
-                        .setLinkUrl(endOfPoNum + 1, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()];
+              isReceiptNumInNotes.map(rctNum => {
+                startIndex = notes.indexOf(rctNum[0]);
+                endIndex = startIndex + rctNum[0].length;
+                row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == rctNum[0] && rct[0] == skus[sku][0]) + 3 : -1;
+                richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD)
+              })
             }
-          }
+            else if (row_PO <= 2) // There is no receipt number and the PO number is not found on the P/O sheet, therefore check if the item is on the Rec'd sheet
+            {
+              idx_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[5] == poNum[0] && rct[0] == skus[sku][0]) : -1;
+
+              if (idx_RECD !== -1) // The item was found on the Rec'd page using the PO number, therefore add the RC number to the notes and hyperlink it
+              {
+                receiptNumber = receiptNumbersAndSku_RECD[idx_RECD][6];
+                endOfPoNum = startIndex + poNum[0].length;
+                endIndex = endOfPoNum + receiptNumber.length + 1;
+                row_RECD = idx_RECD + 3;
+                richTextBuilder_Notes.setText(notes.slice(0, endOfPoNum) + (" " + receiptNumber) + notes.slice(endOfPoNum))
+                                     .setLinkUrl(endOfPoNum + 1, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD)
+              }
+            }
+            else // There is a PO number found in the notes
+              richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':L' + row_PO)
+          })
         }
-        else if (isReceiptNumInNotes)
+        else if (isReceiptNumInNotes.length > 0)
         {
-          receiptNumber = isReceiptNumInNotes[0];
-          startIndex = notes.indexOf(receiptNumber);
-          endIndex = startIndex + receiptNumber.length;
-          row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == receiptNumber && rct[0] == skus[sku][0]) + 3 : -1;
+          isReceiptNumInNotes.map(rctNum => {
+            startIndex = notes.indexOf(rctNum[0]);
+            endIndex = startIndex + rctNum[0].length;
+            row_RECD = (receiptNumbersAndSku_RECD) ? receiptNumbersAndSku_RECD.findIndex(rct => rct[6] == rctNum[0] && rct[0] == skus[sku][0]) + 3 : -1;
+            richTextBuilder_Notes.setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD)
+          })
         }
 
-        return (row_PO > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' +   poSheetId + '&range=A' + row_PO   + ':L' + row_PO  ).build()] : 
-             (row_RECD > 2) ? [noteValues[0].copy().setLinkUrl(startIndex, endIndex, '#gid=' + recdSheetId + '&range=A' + row_RECD + ':L' + row_RECD).build()] : noteValues;
+        return [richTextBuilder_Notes.build()];
       })
 
       notesRange.setRichTextValues(purchaseOrderNumbers);
@@ -3033,7 +3049,8 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
     }
   }
 
-  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
+  spreadsheet.toast('LODGE: ' + numNewLodgeOrder + ' Added ' + (numLodgeOrders - numCurrentLodgeOrders) + ' Removed GUIDE: ' + numNewCharterGuideOrder + 
+                    ' Added ' + (numCharterGuideOrders - numCurrentCharterGuideOrders) + ' Removed', 'Orders Imported', 60)
 }
 
 /**
@@ -3267,7 +3284,8 @@ function updatePriceAndCostOfLeadAndFrozenBait()
   const lastColumn_BaitSheet = baitSheet.getMaxColumns();
   const leadSheetRange = leadSheet.getRange(3, 1, numLeadItems, lastColumn_LeadSheet);
   const baitSheetRange = baitSheet.getRange(3, 1, numBaitItems, lastColumn_BaitSheet);
-  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
+  const formats_leadSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', '$0.00', 
+                             '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const formats_baitSheet = ['@', '@', '@', '@', '@', '@', 'dd MMM yyyy', '$0.00', '$0.00', '#', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '#%', '$0.00', '@'];
   const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
   const discountSS = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs');
@@ -3330,7 +3348,8 @@ function updatePriceAndCostOfLeadAndFrozenBait()
 
   leadSheet.hideColumns(lastColumn_LeadSheet);
   leadSheetRange.setNumberFormats(new Array(numLeadItems).fill(formats_leadSheet)).setValues(leadItems)
-    .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']\n[Prices Updated At: ' + discountSS.getSheetValues(2, 2, 1, 1)[0][0].split(' at ')[1] + ']')
+    .offset(-2, 1, 1, 1).setValue('Description\n\n[Updated At: ' + new Date().toLocaleTimeString() + ' on ' + today + ']\n[Prices Updated At: ' + discountSS.getSheetValues(2, 2, 1, 1)[0][0]
+      .split(' at ')[1] + ']')
 
   const baitItems = baitSheetRange.getValues().map((item, i) => {
     itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase() == item[0])
