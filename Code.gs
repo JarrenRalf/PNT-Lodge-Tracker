@@ -3235,6 +3235,7 @@ function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
   const currentYear = new Date().getFullYear().toString();
   const lastYear = new Date().getFullYear().toString();
   const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
+  const purchaseOrderNumbersOfRecentlyAddedReceipts = [];
   var numReceiptsAdded = 0;
 
   if (lodgeSheetYear == (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
@@ -3253,18 +3254,38 @@ function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
       if (!itemManagement_Receipt.includes(allReceipts[i][receiptNumberIdx]) && !itemManagement_NonLodgeReceipt.includes(allReceipts[i][receiptNumberIdx])) // This PO is not in either item managment PO list
       {
         itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
-        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx])
+        purchaseOrderNumbersOfRecentlyAddedReceipts.push(allReceipts[i][poNumberIdx])
+        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx] + (isBlank(allReceipts[i][poNumberIdx]) ? '' : ' (' + allReceipts[i][poNumberIdx] + ')'))
         numReceiptsAdded++;
       }
     }
   }
 
+  Logger.log('-------------------------------------------')
+
   if (numReceiptsAdded > 0)
+  {
+    const poItemsSheet = spreadsheet.getSheetByName('P/O')
+    const numRows_PoSheet = poItemsSheet.getLastRow() - 2;
+    const numCols_PoSheet = poItemsSheet.getLastColumn();
+    const poNumberIdx_PoSheet = poItemsSheet.getSheetValues(2, 1, 1, numCols_PoSheet)[0].indexOf('Purchase Order #')
+    const poItems = poItemsSheet.getSheetValues(3, 1, numRows_PoSheet, numCols_PoSheet).filter(item => !purchaseOrderNumbersOfRecentlyAddedReceipts.includes(item[poNumberIdx_PoSheet]));
+    const numPoItems = poItems.length;
+
+    if (numPoItems < numRows_PoSheet)
+    {
+      numPoItemsRemoved = numRows_PoSheet - numPoItems;
+      poItemsSheet.getRange(3, 1, numPoItems, numCols_PoSheet).setValues(poItems)
+      poItemsSheet.deleteRows(numPoItems + 3, numPoItemsRemoved);
+    }
+
     itemManagementSheet.getRange(2, 11, itemManagement_ReceiptsWithPos.length, 2).setValues(itemManagement_ReceiptsWithPos.sort((a, b) => (a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0)).activate()
+  }
 
   Logger.log('numReceiptsAdded: ' + numReceiptsAdded)
+  Logger.log('numPoItemsRemoved: ' + numPoItemsRemoved)
 
-  spreadsheet.toast(numReceiptsAdded + ' Added ', 'Receipts Imported', 60)
+  spreadsheet.toast(numReceiptsAdded + ' Receipts Added ' + numPoItemsRemoved + ' Items Removed from P/O sheet', 'Receipts Imported', 60)
 }
 
 /**
