@@ -13,7 +13,7 @@ function onChange(e)
       isAdagioPO_Receipts = 6, isReceivedItems = 7, isBackOrderItems = 8, isPurchaseOrderItems = 9, 
       isInvoicedItems = 10, isCreditedItems = 11, nRows = 0, nCols = 0;
 
-    for (var sheet = 0; sheet < sheets.length; sheet++) // Loop through all of the sheets in this spreadsheet and find the new one
+    for (var sheet = sheets.length - 1; sheet > -1; sheet--) // Loop through all of the sheets in this spreadsheet and find the new one
     {
       if (sheets[sheet].getType() == SpreadsheetApp.SheetType.GRID) // Ignore the chart
       {
@@ -49,7 +49,7 @@ function onChange(e)
           const fileName = sheets[sheet].getSheetName();
 
           if (fileName.substring(0, 7) !== "Copy Of") // Don't delete the sheets that are duplicates
-            spreadsheet.deleteSheet(sheets[sheet]) // Delete the new sheet that was created
+            spreadsheet.deleteSheet(spreadsheet.getSheetByName(fileName)) // Delete the new sheet that was created
 
           if (info[isAdagioOE])
             updateOrdersOnTracker(values, spreadsheet);
@@ -138,11 +138,11 @@ function installedOnOpen(e)
   const newSpreadsheetUrl = spreadsheet.getSheetByName('New Tracker').getSheetValues(1, 1, 1, 1)[0][0];
   const areTriggersCreated = spreadsheet.getSheetByName('Triggers').getRange(1, 1).isChecked();
   const currentTransferSheetYear = lodgeOrdersSheet.getSheetValues(1, 1, 1, 1)[0][0].split(" ").shift();
+  const ui = SpreadsheetApp.getUi();
   var guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet;
 
   if (!isBlank(newSpreadsheetUrl))
   {
-    const ui = SpreadsheetApp.getUi();
     ui.createMenu('Add selected rows to new Lodge Tracker').addItem('Add selected rows to new Lodge Tracker', 'addSelectedRowsToNewLodgeTracker').addToUi();
     ui.showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + newSpreadsheetUrl + '" target="_blank">' + year + ' Lodge Order Tracking 3.0</a></p>')
       .setWidth(250).setHeight(50), 'New Lodge Tracker');
@@ -156,7 +156,10 @@ function installedOnOpen(e)
   // else
     //SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
-  SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Update Chart Data', 'getChartData').addToUi();
+  ui.createMenu('PNT Menu').addItem('Update Chart Data', 'getChartData').addToUi();
+  ui.createMenu('Create Packing Slip')
+    .addItem('Selected Item/s', 'createPackingSlip_SelectedItems')
+    .addItem('All Items', 'createPackingSlip_All').addToUi();
 
   [guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet] = setItemLinks(lodgeOrdersSheet, spreadsheet)
   setTransferSheetLinks(spreadsheet, lodgeOrdersSheet, guideOrdersSheet, lodgeCompletedSheet, guideCompletedSheet,
@@ -720,6 +723,184 @@ function createNewLodgeTracker()
 }
 
 /**
+ * This function takes the user's choice of all items or selected items from the I/O or B/O pages and it populates the Packing Slip with Box Numbers sheet/s
+ * on the PNT WAYBILL (Trite's Copy) with Piece Counts spreadsheet.
+ * 
+ * @param {String} howManyItems : The user's choice of whether all items are to go on a packing slip or just the selected items.
+ * @author Jarren Ralf
+ */
+function createPackingSlip(howManyItems)
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const sheet = spreadsheet.getActiveSheet();
+  const sheetName = sheet.getSheetName();
+
+  if (sheetName === 'B/O' || sheetName === 'I/O')
+  {
+    switch (howManyItems)
+    {
+      case 'All':
+
+        var firstRows = [], lastRows = [];
+
+        var itemValues = [].concat.apply([], spreadsheet.getActiveRangeList().getRanges().map((activeRange, r) => {
+          firstRows.push(activeRange.getRow())
+          lastRows.push(activeRange.getLastRow())
+          return sheet.getSheetValues(firstRows[r], 3, lastRows[r] - firstRows[r] + 1, 9)
+        }))
+
+        if (Math.min(...firstRows) > 2 && Math.max( ...lastRows) <= sheet.getLastRow()) // If the user has not selected an item, alert them with an error message
+        {   
+          const orderNumber = itemValues[0][8];
+
+          if (itemValues.every(item => item[8] === orderNumber))
+          {
+            itemValues = sheet.getSheetValues(3, 3, sheet.getLastRow() - 2, 9).filter(ordNum => ordNum[8] === orderNumber && (ordNum[3] !== 'Instuctin' && ordNum[3] !== 'Commnt'));
+
+            const pntWaybillSS = SpreadsheetApp.openById('1U7uOTLOaH_N9cLrS4kTZmBSWelcECiXvq7311iuAETw');
+            const waybillSheet = pntWaybillSS.getSheetByName('WAYBILL')
+            const gid = waybillSheet.getSheetId();
+            const customerName = itemValues[0][0];
+            const numItemsPerPage = 20;
+            const numPages = Math.ceil(itemValues.length / numItemsPerPage);
+            const customerSelectionRange = waybillSheet.getRange(6, 10, 1, 1);
+            const customerSelectionDataValidation = customerSelectionRange.getDataValidation().getCriteriaValues()[0].getValues();
+            var packingSlipSheet_N, itemsPage_N, previousSheet; 
+
+            const poNumberRange = customerSelectionRange.setValue(findBestCustomerMatch(customerName, customerSelectionDataValidation)) // Customer Data Validation selection
+              .offset(  8, -4, 1, 1).setValue(orderNumber)   // Order Number
+              .offset( 21, -2, 1, 1).setValue('Jarren Ralf') // Employee Name
+              .offset(-21,  7, 1, 1);                        // Purchase Order Number ** Employee needs to fill this in!
+
+            for (var page = 1; page <= numPages; page++)
+            {
+              packingSlipSheet_N = pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString())
+
+              if (packingSlipSheet_N == null)
+              {
+                previousSheet = pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + (page - 1).toString())
+                packingSlipSheet_N = pntWaybillSS.insertSheet('Packing Slip with Box Numbers ' + page.toString(), previousSheet.getIndex(), {template: previousSheet});
+              }
+
+              itemsPage_N = itemValues.filter((_, i) => i >= (page - 1)*numItemsPerPage && i < page*numItemsPerPage);
+
+              packingSlipSheet_N
+                .getRange(18, 2, numItemsPerPage, 1)
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle')
+                .offset(0, 2, numItemsPerPage, 10)
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle')
+                .offset(0, -2, itemsPage_N.length, 1).setValues(itemsPage_N.map(qty => [qty[2]]))
+                .offset(0,  2).setValues(itemsPage_N.map(description => [description[4]]))
+
+              if (numPages > 1)
+                packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('right').setValue('Page ' + page + ' of ' + numPages);
+              else
+                packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('left').setValue('');
+            }
+
+            SpreadsheetApp.getUi()
+              .showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + pntWaybillSS.getUrl() + 
+                '?gid=' + gid + '#gid=' + gid + '&amp;range=' + poNumberRange.getA1Notation() + '" target="_blank"> Enter Customer PO Number</a></p>')
+              .setWidth(250).setHeight(50), 'Packing Slip Created');
+          }
+          else
+            Browser.msgBox('Select ONLY ONE order number.')
+        }
+        else
+          Browser.msgBox('Please select an order.')
+
+        break;
+      case 'Selected':
+
+        var firstRows = [], lastRows = [];
+
+        var itemValues = [].concat.apply([], spreadsheet.getActiveRangeList().getRanges().map((activeRange, r) => {
+          firstRows.push(activeRange.getRow())
+          lastRows.push(activeRange.getLastRow())
+          return sheet.getSheetValues(firstRows[r], 3, lastRows[r] - firstRows[r] + 1, 9)
+        }))
+
+        if (Math.min(...firstRows) > 2 && Math.max( ...lastRows) <= sheet.getLastRow()) // If the user has not selected an item, alert them with an error message
+        {   
+          const orderNumber = itemValues[0][8];
+
+          if (itemValues.every(item => item[8] === orderNumber))
+          {
+            const pntWaybillSS = SpreadsheetApp.openById('1U7uOTLOaH_N9cLrS4kTZmBSWelcECiXvq7311iuAETw');
+            const waybillSheet = pntWaybillSS.getSheetByName('WAYBILL')
+            const gid = waybillSheet.getSheetId();
+            const customerName = itemValues[0][0];
+            const numItemsPerPage = 20;
+            const numPages = Math.ceil(itemValues.length / numItemsPerPage);
+            const customerSelectionRange = waybillSheet.getRange(6, 10, 1, 1);
+            const customerSelectionDataValidation = customerSelectionRange.getDataValidation().getCriteriaValues()[0].getValues();
+            var packingSlipSheet_N, itemsPage_N; 
+
+            const poNumberRange = customerSelectionRange.setValue(findBestCustomerMatch(customerName, customerSelectionDataValidation)) // Customer Data Validation selection
+              .offset(  8, -4, 1, 1).setValue(orderNumber)   // Order Number
+              .offset( 21, -2, 1, 1).setValue('Jarren Ralf') // Employee Name
+              .offset(-21,  7, 1, 1);                        // Purchase Order Number ** Employee needs to fill this in!
+
+            for (var page = 1; page <= numPages; page++)
+            {
+              packingSlipSheet_N = pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString())
+              itemsPage_N = itemValues.filter((_, i) => i >= (page - 1)*numItemsPerPage && i < page*numItemsPerPage);
+
+              packingSlipSheet_N
+                .getRange(18, 2, numItemsPerPage, 1)
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle')
+                .offset(0, 2, numItemsPerPage, 10)
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle')
+                .offset(0, -2, itemsPage_N.length, 1).setValues(itemsPage_N.map(qty => [qty[2]]))
+                .offset(0,  2).setValues(itemsPage_N.map(description => [description[4]]))
+
+              if (numPages > 1)
+                packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('right').setValue('Page ' + page + ' of ' + numPages);
+              else
+                packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('left').setValue('');
+            }
+
+            SpreadsheetApp.getUi()
+              .showModalDialog(HtmlService.createHtmlOutput('<p><a href="' + pntWaybillSS.getUrl() + 
+                '?gid=' + gid + '#gid=' + gid + '&amp;range=' + poNumberRange.getA1Notation() + '" target="_blank"> Enter Customer PO Number</a></p>')
+              .setWidth(250).setHeight(50), 'Packing Slip Created');
+          }
+          else
+            Browser.msgBox('Select item/s associated with ONLY ONE order number.')
+        }
+        else
+          Browser.msgBox('Please select item/s.')
+
+        break;
+    }
+  }
+  else
+    Browser.msgBox('Select Item/s on the B/O or I/O page.')
+}
+
+/**
+ * This function takes all of the items based on an order selected on the I/O or B/O pages and populates the Packing Slip with Box Numbers sheet/s
+ * on the PNT WAYBILL (Trite's Copy) with Piece Counts spreadsheet.
+ * 
+ * @author Jarren Ralf
+ */
+function createPackingSlip_All()
+{
+  createPackingSlip('All')
+}
+
+/**
+ * This function takes all of the slected items from the I/O or B/O pages and populates the Packing Slip with Box Numbers sheet/s
+ * on the PNT WAYBILL (Trite's Copy) with Piece Counts spreadsheet.
+ * 
+ * @author Jarren Ralf
+ */
+function createPackingSlip_SelectedItems()
+{
+  createPackingSlip('Selected')
+}
+
+/**
  * This function finds items on the B/O tab that matches the given order number and deletes them.
  * 
  * @param {String || String[][]} orderNumber       : The order number of the current order being updated on the ORDERS page.
@@ -1244,6 +1425,48 @@ function establishItemLinks_PO(spreadsheet, poSheet, ...sheets)
 }
 
 /**
+ * This function was built by chatGPT to take the given customer name and match to the best result in the customerSelectionDataValidation
+ * which is fouund on the PNT Waybill spreadsheet and that selection populates the relevant fields based on the selection.
+ * 
+ * @param {String}     customerName                    : The selected customer name.
+ * @param {String[][]} customerSelectionDataValidation : The choices of customers from the data validation on the PNT Waybill sheet.
+ * @author chatGPT
+ */
+function findBestCustomerMatch(customerName, customerSelectionDataValidation) {
+
+  const target = normalize(customerName);
+  const targetWords = target.split(" ");
+
+  let bestMatch = null;
+  let bestScore = -1;
+
+  for (let i = 0; i < customerSelectionDataValidation.length; i++) {
+
+    const raw = customerSelectionDataValidation[i][0];
+    if (!raw) continue;
+
+    const namePart = raw.split(" - ")[0];
+    const candidate = normalize(namePart);
+
+    let score = 0;
+
+    if (candidate.includes(target)) score += 100;
+    if (target.includes(candidate)) score += 100;
+
+    for (const w of targetWords) {
+      if (candidate.includes(w)) score += 10;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = raw;
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
  * This function accesses the invoice data from the Lodge, Charter, and Guide Data spreadsheet and extrats the last eight years of information. 
  * With that info if produces a chart of cummulative sales week-to-week for each year.
  * 
@@ -1710,6 +1933,17 @@ function moveRow(e, sheet, spreadsheet)
       }
     }
   }
+}
+
+/**
+ * @author chatGPT
+ */
+function normalize(str) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -2430,7 +2664,7 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
 
     var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                       items.filter(item => item[isItemCompleteIdx])
-                        .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
+                        .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment' || item[skuIdx] === 'Instruction')
                         .map(item => {
 
                           noteValues = reuploadNotes.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
@@ -2476,11 +2710,19 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
       });
     }
 
+    Logger.log('deletedItemsFromCurrentOrder')
+    Logger.log(deletedItemsFromCurrentOrder)
+    Logger.log('deletedItemsFromCurrentOrder.length: ' + deletedItemsFromCurrentOrder.length)
+
+    Logger.log(items)
+
+    Logger.log("items[0][isItemCompleteIdx] == 'No': " + (items[0][isItemCompleteIdx] == 'No'))
+
     if (deletedItemsFromCurrentOrder.length !== 0)
     {
       var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                         items.filter(item => item[isItemCompleteIdx])
-                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
+                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment' || item[skuIdx] === 'Instruction')
                              .map(item => {
 
                                 noteValues = deletedItemsFromCurrentOrder.find(sku => sku[0] == removeDashesFromSku(item[skuIdx])) 
@@ -2509,17 +2751,19 @@ function updateItemsOnTracker(items, spreadsheet, ordNum)
     {
       var newItems = (doesOrderContainBOs(orderNumber, orderNumbers_BO)) ? 
                         items.filter(item => item[isItemCompleteIdx])
-                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment')
+                             .filter(item => item[backOrderQtyIdx] || item[shippedQtyIdx] || item[skuIdx] === 'Comment' || item[skuIdx] === 'Instruction')
                              .map(item => 
                                 [orderDate, enteredByAndApproval[0], customerName, item[originalOrderedQtyIdx], 
                                 Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]), removeDashesFromSku(item[skuIdx]), item[descriptionIdx], 
                                 item[unitPriceIdx], Number(Number(item[backOrderQtyIdx]) + Number(item[shippedQtyIdx]))*Number(item[unitPriceIdx]), 
                                 locationName , orderNumber, '', '']) : 
-      items.map(item => 
-        [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
-        item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
-        '', ''])
+        items.map(item => 
+          [orderDate, enteredByAndApproval[0], customerName, enteredByAndApproval[1], item[orderedQtyIdx], removeDashesFromSku(item[skuIdx]), 
+          item[descriptionIdx], item[unitPriceIdx], Number(item[orderedQtyIdx])*Number(item[unitPriceIdx]), locationName , orderNumber, 
+          '', ''])
     }
+
+    Logger.log(newItems)
   }
 
   const numNewItems = newItems.length;
@@ -2777,34 +3021,43 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order'); 
 
       Logger.log('The following Lodge Orders were removed because they were found to be fully completed as per the invoice history:')
-      const currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
 
-        isLodgeOrderComplete = lodgePartiallyCompleteOrders.find(partialOrd => partialOrd[0] == currentOrd[2])
+      if (numLodgeOrders > 0)
+      {
+        var currentLodgeOrders = lodgeOrdersSheet.getSheetValues(3, 1, numLodgeOrders, 14).map(currentOrd => {
 
-        if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
-        {
-          currentOrd[10] = 'multiple';
-          currentOrd[13] = 'Partial Order';
-        }
+          isLodgeOrderComplete = lodgePartiallyCompleteOrders.find(partialOrd => partialOrd[0] == currentOrd[2])
 
-        return currentOrd;
+          if (isLodgeOrderComplete && isLodgeOrderComplete[1] === 'No')
+          {
+            currentOrd[10] = 'multiple';
+            currentOrd[13] = 'Partial Order';
+          }
 
-        }).filter(currentOrd => {
+          return currentOrd;
 
-          isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]); 
+          }).filter(currentOrd => {
 
-          if (isLodgeOrderComplete)
-            Logger.log(currentOrd);
-          
-          return !isLodgeOrderComplete;
-      });
+            isLodgeOrderComplete = completedLodgeOrderNumbers.includes(currentOrd[2]); 
+
+            if (isLodgeOrderComplete)
+              Logger.log(currentOrd);
+            
+            return !isLodgeOrderComplete;
+        });
+      }
+      else
+        var currentLodgeOrders = []
 
       var numCurrentLodgeOrders = currentLodgeOrders.length;
 
-      if (numCurrentLodgeOrders < numLodgeOrders)
-        lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).clearContent().offset(0, 0, numCurrentLodgeOrders, 14).setValues(currentLodgeOrders);
-      else if (numCurrentLodgeOrders === numLodgeOrders)
-        lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).setValues(currentLodgeOrders);
+      if (numCurrentLodgeOrders > 0)
+      {
+        if (numCurrentLodgeOrders < numLodgeOrders)
+          lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).clearContent().offset(0, 0, numCurrentLodgeOrders, 14).setValues(currentLodgeOrders);
+        else if (numCurrentLodgeOrders === numLodgeOrders)
+          lodgeOrdersSheet.getRange(3, 1, numLodgeOrders, 14).setValues(currentLodgeOrders);
+      }
     }
     else
       var numCurrentLodgeOrders = numLodgeOrders;
@@ -2816,35 +3069,44 @@ function updateOrdersOnTracker(allOrders, spreadsheet)
         .map(ord => ord[0].toString()).flat()
         .filter(ordNum => isNotBlank(ordNum) && ordNum !== 'No Order');
 
-      Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
-      const currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14).map(currentOrd => {
-        
-        isCharterGuideOrderComplete = charterGuidePartiallyCompleteOrders.find(partialOrd => partialOrd[0] == currentOrd[2])
+      if (numCharterGuideOrders > 0)
+      {
+        Logger.log('The following Guide Orders were removed because they were found to be fully completed as per the invoice history:')
 
-        if (isCharterGuideOrderComplete && isCharterGuideOrderComplete[1] === 'No')
-        {
-          currentOrd[10] = 'multiple';
-          currentOrd[13] = 'Partial Order';
-        }
+        var currentCharterGuideOrders = charterGuideOrdersSheet.getSheetValues(3, 1, numCharterGuideOrders, 14).map(currentOrd => {
+          
+          isCharterGuideOrderComplete = charterGuidePartiallyCompleteOrders.find(partialOrd => partialOrd[0] == currentOrd[2])
 
-        return currentOrd;
+          if (isCharterGuideOrderComplete && isCharterGuideOrderComplete[1] === 'No')
+          {
+            currentOrd[10] = 'multiple';
+            currentOrd[13] = 'Partial Order';
+          }
 
-        }).filter(currentOrd => {
+          return currentOrd;
 
-          isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]); // Invoice # and Order Status must both be blank
+          }).filter(currentOrd => {
 
-          if (isCharterGuideOrderComplete)
-            Logger.log(currentOrd);
+            isCharterGuideOrderComplete = completedCharterGuideOrderNumbers.includes(currentOrd[2]); // Invoice # and Order Status must both be blank
 
-          return !isCharterGuideOrderComplete;
+            if (isCharterGuideOrderComplete)
+              Logger.log(currentOrd);
+
+            return !isCharterGuideOrderComplete;
         });
+      }
+      else
+        var currentCharterGuideOrders = [];
 
       var numCurrentCharterGuideOrders = currentCharterGuideOrders.length;
 
-      if (numCurrentCharterGuideOrders < numCharterGuideOrders)
-        charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
-      else if (numCurrentCharterGuideOrders === numCharterGuideOrders)
-        charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
+      if (numCharterGuideOrders > 0)
+      {
+        if (numCurrentCharterGuideOrders < numCharterGuideOrders)
+          charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).clearContent().offset(0, 0, numCurrentCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
+        else if (numCurrentCharterGuideOrders === numCharterGuideOrders)
+          charterGuideOrdersSheet.getRange(3, 1, numCharterGuideOrders, 14).setValues(currentCharterGuideOrders);
+      }
     }
     else
       var numCurrentCharterGuideOrders = numCharterGuideOrders;
@@ -3236,7 +3498,7 @@ function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
   const lastYear = new Date().getFullYear().toString();
   const lodgeSheetYear = spreadsheet.getSheetByName('LODGE ORDERS').getSheetValues(1, 1, 1, 1)[0][0].split(' ').shift();
   const purchaseOrderNumbersOfRecentlyAddedReceipts = [];
-  var numReceiptsAdded = 0;
+  var numReceiptsAdded = 0, numPoItemsRemoved = 0;
 
   if (lodgeSheetYear == (new Date().getFullYear() + 1).toString()) // Is this next years lodge sheet?
     var includeLastYearsFinalQuarterOrders = true;
@@ -3255,7 +3517,8 @@ function updatePoReceiptsOnTracker(allReceipts, spreadsheet)
       {
         itemManagement_ReceiptsWithPos.push([allReceipts[i][poNumberIdx], allReceipts[i][receiptNumberIdx]]) // Add the PO number to the item management po list
         purchaseOrderNumbersOfRecentlyAddedReceipts.push(allReceipts[i][poNumberIdx])
-        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx] + (isBlank(allReceipts[i][poNumberIdx]) ? '' : ' (' + allReceipts[i][poNumberIdx] + ')'))
+        Logger.log('allReceipts[i][poNumberIdx].length:' + allReceipts[i][poNumberIdx].length)
+        Logger.log('Add this Receipt to Item Management List: ' + allReceipts[i][receiptNumberIdx] + ((allReceipts[i][poNumberIdx] == ' ') ? '' : ' (' + allReceipts[i][poNumberIdx] + ')'))
         numReceiptsAdded++;
       }
     }
