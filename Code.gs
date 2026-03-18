@@ -785,17 +785,23 @@ function createPackingSlip(howManyItems)
               itemsPage_N = itemValues.filter((_, i) => i >= (page - 1)*numItemsPerPage && i < page*numItemsPerPage);
 
               packingSlipSheet_N
-                .getRange(18, 2, numItemsPerPage, 1)
-                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle')
-                .offset(0, 2, numItemsPerPage, 10)
-                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle')
-                .offset(0, -2, itemsPage_N.length, 1).setValues(itemsPage_N.map(qty => [qty[2]]))
-                .offset(0,  2).setValues(itemsPage_N.map(description => [description[4]]))
+                .getRange(18, 2, numItemsPerPage, 12).clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                  .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                .offset(0, 0, itemsPage_N.length, 3).setValues(itemsPage_N.map(item => [item[2], '', item[4]]))
 
               if (numPages > 1)
                 packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('right').setValue('Page ' + page + ' of ' + numPages);
               else
                 packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('left').setValue('');
+            }
+
+            while (pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()))
+            {
+              pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()).getRange(18, 2, numItemsPerPage, 12)
+                .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+
+              page++
             }
 
             SpreadsheetApp.getUi()
@@ -847,17 +853,23 @@ function createPackingSlip(howManyItems)
               itemsPage_N = itemValues.filter((_, i) => i >= (page - 1)*numItemsPerPage && i < page*numItemsPerPage);
 
               packingSlipSheet_N
-                .getRange(18, 2, numItemsPerPage, 1)
-                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle')
-                .offset(0, 2, numItemsPerPage, 10)
-                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle')
-                .offset(0, -2, itemsPage_N.length, 1).setValues(itemsPage_N.map(qty => [qty[2]]))
-                .offset(0,  2).setValues(itemsPage_N.map(description => [description[4]]))
+                .getRange(18, 2, numItemsPerPage, 12).clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                  .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                .offset(0, 0, itemsPage_N.length, 3).setValues(itemsPage_N.map(item => [item[2], '', item[4]]))
 
               if (numPages > 1)
                 packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('right').setValue('Page ' + page + ' of ' + numPages);
               else
                 packingSlipSheet_N.getRange(39, 5).setHorizontalAlignment('left').setValue('');
+            }
+
+            while (pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()))
+            {
+              pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()).getRange(18, 2, numItemsPerPage, 12)
+                .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+
+              page++
             }
 
             SpreadsheetApp.getUi()
