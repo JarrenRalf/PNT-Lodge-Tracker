@@ -784,7 +784,7 @@ function createPackingSlip(howManyItems)
 
               itemsPage_N = itemValues.filter((_, i) => i >= (page - 1)*numItemsPerPage && i < page*numItemsPerPage);
 
-              packingSlipSheet_N
+              packingSlipSheet_N.showSheet()
                 .getRange(18, 2, numItemsPerPage, 12).clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
                   .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
                 .offset(0, 0, itemsPage_N.length, 3).setValues(itemsPage_N.map(item => [item[2], '', item[4]]))
@@ -798,8 +798,10 @@ function createPackingSlip(howManyItems)
             while (pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()))
             {
               pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()).getRange(18, 2, numItemsPerPage, 12)
-                .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
-                .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                  .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                .offset(21, 3, 1, 1).setHorizontalAlignment('left').setValue('')
+                .getSheet().hideSheet()
 
               page++
             }
@@ -866,8 +868,9 @@ function createPackingSlip(howManyItems)
             while (pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()))
             {
               pntWaybillSS.getSheetByName('Packing Slip with Box Numbers ' + page.toString()).getRange(18, 2, numItemsPerPage, 12)
-                .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
-                .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                  .clearContent().setFontColor('black').setFontFamily('Arial').setFontSize(11).setFontWeight('bold').setVerticalAlignment('middle')
+                  .setHorizontalAlignments(new Array(numItemsPerPage).fill(['center', ...new Array(11).fill('left')]))
+                .offset(21, 3, 1, 1).setHorizontalAlignment('left').setValue('');
 
               page++
             }
