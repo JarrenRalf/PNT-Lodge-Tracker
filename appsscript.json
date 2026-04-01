@@ -3,5 +3,12 @@
   "dependencies": {
   },
   "exceptionLogging": "STACKDRIVER",
-  "runtimeVersion": "V8"
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [{
+      "menuName": "updateRow",
+      "functionName": "updateRow",
+      "defaultShortcut": "Ctrl+Alt+Shift+9"
+    }]
+  }
 }

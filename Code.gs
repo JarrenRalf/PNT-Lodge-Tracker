@@ -156,7 +156,9 @@ function installedOnOpen(e)
   // else
     //SpreadsheetApp.getUi().createMenu('PNT Menu').addItem('Check Approval of Selected Orders', 'sendEmails_CheckApprovalOfSelectedOrders').addToUi();
 
-  ui.createMenu('PNT Menu').addItem('Update Chart Data', 'getChartData').addToUi();
+  ui.createMenu('PNT Menu')
+    .addItem('Analyze Profit Margins on Selected Order', 'createProfitAnalyzerForSelectedCustomer')
+    .addItem('Update Chart Data', 'getChartData').addToUi();
   ui.createMenu('Create Packing Slip')
     .addItem('Selected Item/s', 'createPackingSlip_SelectedItems')
     .addItem('All Items', 'createPackingSlip_All').addToUi();
@@ -913,6 +915,76 @@ function createPackingSlip_All()
 function createPackingSlip_SelectedItems()
 {
   createPackingSlip('Selected')
+}
+
+/**
+ * This function inserts a new sheet that allows a user to analyze profit margins for the specified order.
+ * 
+ * @author Jarren Ralf
+ */
+function createProfitAnalyzerForSelectedCustomer()
+{
+  const spreadsheet = SpreadsheetApp.getActive();
+  const sheet = spreadsheet.getActiveSheet();
+  const sheetName = sheet.getSheetName();
+  const range = sheet.getActiveRange();
+  const row = range.getRow();
+  const col = range.getColumn()
+
+  if (sheetName.includes(' ORDERS')) // Orders sheets
+  {
+    if (row > 2)
+    {
+      const orderNumber = range.offset(0, 3 - col, 1, 1).getValue()
+
+      if (isNotBlank(orderNumber))
+      {
+        const isBackOrder = range.offset(0, 11 - col, 1, 1).getValue();
+        const customerName = range.offset(0, 6 - col, 1, 1).getValue();
+        const itemsSheet = (isNotBlank(isBackOrder)) ? spreadsheet.getSheetByName('B/O') : spreadsheet.getSheetByName('I/O');
+        const order = itemsSheet.getSheetValues(3, 1, itemsSheet.getLastRow() - 2, itemsSheet.getLastColumn()).filter(ordNum => ordNum[10] === orderNumber)
+        insertProfitAnalyzerSheet(order, orderNumber, customerName, spreadsheet)
+      }
+      else
+        Browser.msgBox('The order number from the selected row is blank.')
+    }
+    else
+      Browser.msgBox('Select a row that contains an order number.')
+  }
+  else if (sheetName.includes('/O') && !sheetName.includes('P/')) // The I/O or B/O sheet
+  {
+    if (row > 2)
+    {
+      const orderNumber = range.offset(0, 11 - col, 1, 1).getValue()
+
+      if (isNotBlank(orderNumber))
+      {
+        const customerName = range.offset(0, 3 - col, 1, 1).getValue();
+        const order = sheet.getSheetValues(3, 1, sheet.getLastRow() - 2, sheet.getLastColumn()).filter(ordNum => ordNum[10] === orderNumber)
+        insertProfitAnalyzerSheet(order, orderNumber, customerName, spreadsheet)
+      }
+      else
+        Browser.msgBox('The order number from the selected row is blank.')
+    }
+    else
+      Browser.msgBox('Select a row that contains an order number.')
+  }
+  else if (/\d{5}_/.test(sheetName)) // The user is on the analyzer sheet for a specific customer and order number
+  {
+    const orderNumber = sheetName.match(/\d{5}/)[0];
+    const ioSheet = spreadsheet.getSheetByName('I/O');
+    const boSheet = spreadsheet.getSheetByName('B/O');
+    const numCols = ioSheet.getLastColumn();
+    const ioItems = ioSheet.getSheetValues(3, 1, ioSheet.getLastRow() - 2, numCols);
+    const order = (ioItems.some(ordNum => ordNum[10] === orderNumber)) ? 
+                    ioItems.filter(ordNum => ordNum[10] === orderNumber) : 
+                  boSheet.getSheetValues(3, 1, boSheet.getLastRow() - 2, numCols).filter(ordNum => ordNum[10] === orderNumber)
+    const customerName = order[0][2];
+
+    insertProfitAnalyzerSheet(order, orderNumber, customerName, spreadsheet, sheet)
+  }
+  else
+    Browser.msgBox('Select an order from the I/O, B/O, or either ORDERS sheets.')
 }
 
 /**
@@ -1705,6 +1777,114 @@ function getProperTypesetName(name, listOfNames, colSelector)
   const properTypesetName = listOfNames.find(customer => customer[0] === name)
   
   return (properTypesetName) ? properTypesetName[colSelector] : name;
+}
+
+/**
+ * This function takes takes the given order data and the lodge tracker spreadsheet and it inserts a new sheet
+ * that allows the user to analyze the profit margins for that order.
+ * 
+ * @param {String[][]}        order : The order that the user has selected.
+ * @param {String}      orderNumber : The selected order number.
+ * @param {String}     customerName : The name of the selected customer.
+ * @param {Spreadsheet} spreadsheet : The active spreadsheet.
+ * @param {Sheet}  oldAnalyzerSheet : The analyzer sheet for the chosen customer if it already exists, by default I check if it exists.
+ * @author Jarren Ralf
+ */
+function insertProfitAnalyzerSheet(order, orderNumber, customerName, spreadsheet, oldAnalyzerSheet = spreadsheet.getSheetByName(orderNumber + '_' + customerName))
+{
+  if (oldAnalyzerSheet) // If an old analyzer sheet exists for the selected order
+    spreadsheet.deleteSheet(oldAnalyzerSheet);
+
+  const templateSheet = spreadsheet.getSheetByName('Analyzer Template');
+  const analyzerSheet = spreadsheet.insertSheet(orderNumber + '_' + customerName, 6, {template: templateSheet});
+  const discountSS = SpreadsheetApp.openById('1gXQ7uKEYPtyvFGZVmlcbaY6n6QicPBhnCBxk-xqwcFs');
+  const discountSheet = discountSS.getSheetByName('Discount Percentages');
+  const discounts = discountSheet.getSheetValues(2, 11, discountSheet.getLastRow() - 1, 5)
+  const costData = Utilities.parseCsv(DriveApp.getFilesByName("inventory.csv").next().getBlob().getDataAsString());
+  const header = costData.shift();
+  const itemNumber_InventoryCsv = header.indexOf('Item #')
+  const cost = header.indexOf('Cost')
+  const formats = ['#', '@', '@', '$0.00', '#%', '$0.00', '#%', '$0.00', '$0.00', '$0.00', '$0.00'];
+  const numCols = formats.length;
+  const numItems = order.length;
+  var itemValues, discountValues;
+
+  const items = order.map((item, i) => {
+
+    item[0] = item[4]; // Order Quantity
+    item[1] = item[5].toString().toUpperCase().trim(); // SKU
+    item[2] = item[6]; // Description
+    item.splice(numCols)
+
+    row = i + 4;
+
+    itemValues = costData.find(sku => sku[itemNumber_InventoryCsv].toString().toUpperCase().trim() == item[1])
+    discountValues = discounts.find(description => description[0].split(' - ').pop().toString().toUpperCase().trim() == item[1])
+
+    if (discountValues && item[1] !== 'MISCITEM')
+    {
+      item[5] = Number(discountValues[1]);     // Base Price
+      item[6] = Number(discountValues[4])/100; // Wholesale Percent
+    }
+    else
+    {
+      item[5] = 0;
+      item[6] = "=IF(OR(EQ(H" + row + ",0),EQ(F" + row + ",0)),0,1-H" + row + "/F" + row + ")";
+    }
+
+    if (itemValues && item[1] !== 'MISCITEM')
+    {
+      item[3] = itemValues[cost]; // Adagio Cost
+      item[4] = (Number(itemValues[cost])) ? Number(item[5])/Number(itemValues[cost]) : 0; // Markup %
+    }
+    else
+    {
+      item[3] = 0;
+      item[4] = "=IF(OR(EQ(D" + row + ",0),EQ(F" + row + ",0)),0,F" + row + "/D" + row + ")"
+    }
+
+    if (item[3] != 0)
+    {
+      item[ 9] = item[7] - item[3];
+      item[10] = item[0]*Math.round((item[7] - item[3])*100)/100;
+    }
+    else
+    {
+      item[ 9] = "=IF(OR(EQ(D" + row + ",0),EQ(H" + row + ",0)),0,H" + row + "-D" + row + ")"
+      item[10] = "=IF(OR(EQ(D" + row + ",0),EQ(H" + row + ",0),EQ(A" + row + ",0)),0,(H" + row + "-D" + row + ")*A" + row + ")"
+    }
+
+    if (item[7] == 0 && item[8] == 0) // The sell price has been set to zero
+    {
+      item[ 8] = "=IF(OR(EQ(A" + row + ",0),EQ(H" + row + ",0)),0,H" + row + "*A" + row + ")"
+      item[ 9] = "=IF(OR(EQ(D" + row + ",0),EQ(H" + row + ",0)),0,H" + row + "-D" + row + ")"
+      item[10] = "=IF(OR(EQ(D" + row + ",0),EQ(H" + row + ",0),EQ(A" + row + ",0)),0,(H" + row + "-D" + row + ")*A" + row + ")"
+    }
+
+    if (item[1] === 'INSTUCTIN' || item[1] === 'COMMNT')
+    {
+      item[ 3] = '';
+      item[ 4] = '';
+      item[ 5] = '';
+      item[ 6] = '';
+      item[ 7] = '';
+      item[ 8] = '';
+      item[ 9] = '';
+      item[10] = '';
+    }
+
+    return item
+  })
+
+  analyzerSheet.getRange(4, 1, numItems, formats.length).setNumberFormats(new Array(numItems).fill(formats))
+    .setBorder(null, null, null, true, null, null, 'black', SpreadsheetApp.BorderStyle.SOLID_THICK).setValues(items)
+
+  const me = Session.getEffectiveUser();
+  const protection = analyzerSheet.protect().setUnprotectedRanges([analyzerSheet.getRange('N4:N')]).addEditor(me);
+  protection.removeEditors(protection.getEditors());
+
+  if (protection.canDomainEdit())
+    protection.setDomainEdit(false);
 }
 
 /**
